@@ -11,6 +11,7 @@ declare_id!("HEqjCVX5AHi9kYFF955HbEeTF95DUdz1aZTviRucL16d");
 
 #[program]
 pub mod prediction_market_amm {
+
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, seed: u64, name: String, fee: u16, authority: Option<Pubkey>) -> Result<()> {
@@ -19,5 +20,9 @@ pub mod prediction_market_amm {
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64, max_yes: u64, max_no: u64, expiration: i64) -> Result<()> {
         ctx.accounts.deposit(amount, max_yes, max_no, expiration)
+    }
+
+    pub fn swap(ctx: Context<Swap>, is_yes: bool, amount: u64, min: u64) -> Result<()> {
+        ctx.accounts.swap(is_yes, amount, min)
     }
 }

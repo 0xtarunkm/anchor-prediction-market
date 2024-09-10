@@ -20,7 +20,7 @@ macro_rules! assert_not_locked {
 macro_rules! assert_not_expired {
     ($expiration:expr) => {
         if Clock::get()?.unix_timestamp > $expiration {
-            return err!(MarketError::OfferExpired)
+            return err!(MarketError::OfferExpired);
         }
     };
 }

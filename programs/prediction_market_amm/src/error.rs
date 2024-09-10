@@ -48,7 +48,7 @@ pub enum MarketError {
 }
 
 impl From<CurveError> for MarketError {
-    fn from(error: CurveError) -> Self {
+    fn from(error: CurveError) -> MarketError {
         match error {
             CurveError::InvalidPrecision => MarketError::InvalidPrecision,
             CurveError::Overflow => MarketError::Overflow,

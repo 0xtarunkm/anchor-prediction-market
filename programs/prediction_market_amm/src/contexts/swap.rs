@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked}};
-use prediction_market_curve::OutcomeToken;
+use prediction_market_curve::{OutcomeToken, PredictionMarket};
 
-use crate::states::Market;
+use crate::{error::MarketError, states::Market};
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
@@ -73,6 +73,27 @@ pub struct Swap<'info> {
 }
 
 impl<'info> Swap<'info> {
+    pub fn swap(
+        &mut self,
+        is_yes: bool,
+        amount: u64,
+        min: u64,
+        // expiration: i64
+    ) -> Result<()> {
+        let mut curve = PredictionMarket::init(self.vault_stablecoin.amount, self.vault_yes.amount, self.vault_no.amount, self.market.fee, Some(6)).map_err(MarketError::from)?;
+
+        let token = match is_yes {
+            true => OutcomeToken::YES,
+            false => OutcomeToken::NO
+        };
+
+        let res = curve.swap(token, amount, min).unwrap();
+        
+        self.deposit_tokens(token, res.usdc_amount)?;
+        self.withdraw_token(token, res.token_amount)?;
+        Ok(())
+    }
+
     pub fn deposit_tokens(
         &mut self,
         token: OutcomeToken,
