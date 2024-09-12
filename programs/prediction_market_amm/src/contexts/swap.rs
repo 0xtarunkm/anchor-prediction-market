@@ -7,8 +7,22 @@ use crate::{error::MarketError, states::Market};
 #[derive(Accounts)]
 pub struct Swap<'info> {
     #[account(mut)]
-    user: Signer<'info>,
+    user: Signer<'info>,    
+    #[account(
+        mut,
+        seeds = [b"yes", market.key().as_ref()],
+        bump,
+        mint::decimals = 6,
+        mint::authority = auth,
+    )]
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
+    #[account(
+        mut,
+        seeds = [b"no", market.key().as_ref()],
+        bump,
+        mint::decimals = 6,
+        mint::authority = auth,
+    )]
     mint_no: Box<InterfaceAccount<'info, Mint>>,
     mint_stablecoin: Box<InterfaceAccount<'info, Mint>>,    
     #[account(
@@ -90,8 +104,7 @@ impl<'info> Swap<'info> {
         let res = curve.swap(token, amount, min).unwrap();
         
         self.deposit_tokens(token, res.usdc_amount)?;
-        self.withdraw_token(token, res.token_amount)?;
-        Ok(())
+        self.withdraw_token(token, res.token_amount)
     }
 
     pub fn deposit_tokens(
@@ -117,6 +130,7 @@ impl<'info> Swap<'info> {
             to,
             authority: self.user.to_account_info()
         };
+        
         let ctx = CpiContext::new(self.token_program.to_account_info(), account);
 
         transfer_checked(ctx, amount, 6)

@@ -22,6 +22,10 @@ pub mod prediction_market_amm {
         ctx.accounts.deposit(amount, max_yes, max_no, expiration)
     }
 
+    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_yes: u64, min_no: u64, expiration: i64) -> Result<()> {
+        ctx.accounts.withdraw(amount, min_yes, min_no, expiration)
+    }
+
     pub fn swap(ctx: Context<Swap>, is_yes: bool, amount: u64, min: u64) -> Result<()> {
         ctx.accounts.swap(is_yes, amount, min)
     }
