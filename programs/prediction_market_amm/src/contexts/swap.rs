@@ -80,7 +80,7 @@ pub struct Swap<'info> {
         seeds = [b"market", market.seed.to_le_bytes().as_ref()],
         bump = market.market_bump,
     )]
-    pub market: Account<'info, Market>,
+    pub market: Box<Account<'info, Market>>,
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,

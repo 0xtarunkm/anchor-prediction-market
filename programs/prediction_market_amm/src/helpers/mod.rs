@@ -28,11 +28,11 @@ macro_rules! assert_not_expired {
 #[macro_export]
 macro_rules! has_update_authority {
     ($x:expr) => {
-        match $x.config.authority {
+        match $x.market.authority {
             Some(a) => {
-                require_keys_eq!(a, $x.user.key(), MarketError::InvalidAuthority);
+                require_keys_eq!(a, $x.admin.key(), crate::error::MarketError::InvalidAuthority);
             },
-            None => return err!(MarketError::NoAuthoritySet)
+            None => return err!(crate::error::MarketError::NoAuthoritySet)
         }
     };
 }

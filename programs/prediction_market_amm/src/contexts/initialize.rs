@@ -52,7 +52,7 @@ pub struct Initialize<'info> {
 }
 
 impl<'info> Initialize<'info> {
-    pub fn init(
+    pub fn save_market(
         &mut self,
         seed: u64,
         name: String,

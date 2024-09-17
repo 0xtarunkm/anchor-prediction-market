@@ -98,9 +98,9 @@ impl<'info> Deposit<'info> {
         let (yes_amount, no_amount, lp_tokens, _) = match self.mint_lp.supply == 0 && self.vault_no.amount == 0 && self.vault_yes.amount == 0 {
             true =>  (max_yes, max_no, amount, amount),
             false => {
-                let market = PredictionMarket::add_liquidity(amount, self.vault_yes.amount, self.vault_no.amount, self.vault_stablecoin.amount, 10_0000, self.mint_lp.supply).unwrap();
+                let market = PredictionMarket::add_liquidity(&mut self, amount).unwrap();
 
-                (market.yes_amount, market.no_amount, market.lp_tokens, market.total_usdc)
+                (market.yes_amount, market.no_amount, market.lp_tokens, market.usdc_amount)
             }
         };
 

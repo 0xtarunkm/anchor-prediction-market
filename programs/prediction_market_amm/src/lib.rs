@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 mod states;
 mod contexts;
-mod helpers;
 mod error;
+pub mod helpers;
 
 use contexts::*;
 
@@ -15,18 +15,28 @@ pub mod prediction_market_amm {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, seed: u64, name: String, fee: u16, authority: Option<Pubkey>) -> Result<()> {
-        ctx.accounts.init(seed, name, fee, authority, &ctx.bumps)
+        ctx.accounts.save_market(seed, name, fee, authority, &ctx.bumps)
     }
 
+    // add liquidity to mint LP tokens
     pub fn deposit(ctx: Context<Deposit>, amount: u64, max_yes: u64, max_no: u64, expiration: i64) -> Result<()> {
         ctx.accounts.deposit(amount, max_yes, max_no, expiration)
     }
 
+    // burn lp tokens to withdraw liquidity
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_yes: u64, min_no: u64, expiration: i64) -> Result<()> {
         ctx.accounts.withdraw(amount, min_yes, min_no, expiration)
     }
 
     pub fn swap(ctx: Context<Swap>, is_yes: bool, amount: u64, min: u64) -> Result<()> {
         ctx.accounts.swap(is_yes, amount, min)
+    }
+
+    pub fn lock(ctx: Context<Update>) -> Result<()> {
+        ctx.accounts.lock()
+    }
+
+    pub fn unlock(ctx: Context<Update>) -> Result<()> {
+        ctx.accounts.unlock()
     }
 }

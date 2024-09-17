@@ -1439,7 +1439,7 @@ dependencies = [
 [[package]]
 name = "prediction-market-curve"
 version = "0.1.0"
-source = "git+https://github.com/0xtarunkm/prediction-market-curve.git#a4f58abfd955733dc4fc0d39fdbd56fd777067dc"
+source = "git+https://github.com/0xtarunkm/prediction-market-curve.git#f24fe9458b4df3231f79ef7cff8276fe6fac9f6c"
 
 [[package]]
 name = "prediction_market_amm"
