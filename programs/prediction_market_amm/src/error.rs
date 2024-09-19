@@ -43,5 +43,7 @@ pub enum MarketError {
     #[msg("Market not settled")]
     MarketNotSettled,
     #[msg("Not authorized to perform this")]
-    Unauthorized
+    Unauthorized,
+    #[msg("Market is not expired")]
+    MarketNotEnded
 }

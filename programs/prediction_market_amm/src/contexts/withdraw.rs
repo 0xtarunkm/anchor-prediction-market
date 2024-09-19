@@ -41,26 +41,26 @@ pub struct Withdraw<'info> {
         associated_token::mint = mint_stablecoin,
         associated_token::authority = auth
     )]
-    user_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
         associated_token::authority = auth
     )]
-    user_yes: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
         associated_token::authority = auth
     )]
-    user_no: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
         payer = user,
         associated_token::mint = mint_lp,
         associated_token::authority = user,
     )]
-    user_lp: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_lp: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: this is safe
     #[account(
         seeds = [b"auth"],
@@ -105,7 +105,7 @@ impl<'info> Withdraw<'info> {
         let cpi_accounts = TransferChecked {
             from: self.vault_stablecoin.to_account_info(),
             mint: self.mint_stablecoin.to_account_info(),
-            to: self.user_stablecoin.to_account_info(),
+            to: self.user_ata_stablecoin.to_account_info(),
             authority: self.auth.to_account_info()
         };
 
@@ -125,8 +125,8 @@ impl<'info> Withdraw<'info> {
     pub fn withdraw_tokens(&self, is_yes: bool, amount: u64) -> Result<()> {
 
         let (from, to, mint, decimals) = match is_yes {
-            true => ( self.vault_yes.to_account_info(), self.user_yes.to_account_info(), self.mint_yes.to_account_info(), self.mint_yes.decimals),
-            false => (self.vault_no.to_account_info(), self.user_no.to_account_info(), self.mint_no.to_account_info(), self.mint_yes.decimals)
+            true => ( self.vault_yes.to_account_info(), self.user_ata_yes.to_account_info(), self.mint_yes.to_account_info(), self.mint_yes.decimals),
+            false => (self.vault_no.to_account_info(), self.user_ata_no.to_account_info(), self.mint_no.to_account_info(), self.mint_yes.decimals)
         };
 
         let cpi_accounts = TransferChecked {
@@ -152,7 +152,7 @@ impl<'info> Withdraw<'info> {
     pub fn burn_lp_tokens(&self, amount: u64) -> Result<()> {
         let cpi_accounts = Burn {
             mint: self.mint_lp.to_account_info(),
-            from: self.user_lp.to_account_info(),
+            from: self.user_ata_lp.to_account_info(),
             authority: self.user.to_account_info()
         };
 

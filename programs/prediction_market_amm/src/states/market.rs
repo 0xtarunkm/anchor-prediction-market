@@ -13,6 +13,7 @@ pub struct Market {
     pub total_liquidity: u64,
     pub fee: u16,
     pub locked: bool,
+    pub end_time: i64,
     pub settled: bool,
     pub auth_bump: u8,
     pub market_bump: u8

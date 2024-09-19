@@ -41,6 +41,12 @@ pub struct SettleResult {
     pub total_payout: u64,
 }
 
+#[derive(Debug, Clone)]
+pub enum Outcome {
+    YES,
+    NO
+}
+
 #[derive(Debug)]
 pub enum CurveError {
     InvalidPrecision,

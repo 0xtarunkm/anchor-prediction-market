@@ -10,5 +10,11 @@ pub use withdraw::*;
 pub mod swap;
 pub use swap::*;
 
+pub mod settle;
+pub use settle::*;
+
+pub mod claim;
+pub use claim::*;
+
 pub mod update;
 pub use update::*;

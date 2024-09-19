@@ -57,6 +57,7 @@ impl<'info> Initialize<'info> {
         seed: u64,
         name: String,
         fee: u16,
+        end_time: i64,
         authority: Option<Pubkey>,
         bumps: &InitializeBumps
     ) -> Result<()> {
@@ -68,6 +69,7 @@ impl<'info> Initialize<'info> {
             mint_no: self.mint_no.key(), 
             mint_stablecoin: self.mint_stablecoin.key(), 
             total_liquidity: 0,
+            end_time,
             fee, 
             locked: false, 
             settled: false, 

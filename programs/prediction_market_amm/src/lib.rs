@@ -14,8 +14,8 @@ pub mod prediction_market_amm {
 
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, seed: u64, name: String, fee: u16, authority: Option<Pubkey>) -> Result<()> {
-        ctx.accounts.save_market(seed, name, fee, authority, &ctx.bumps)
+    pub fn initialize(ctx: Context<Initialize>, seed: u64, name: String, fee: u16, end_time: i64,authority: Option<Pubkey>) -> Result<()> {
+        ctx.accounts.save_market(seed, name, fee, end_time, authority, &ctx.bumps)
     }
 
     // add liquidity to mint LP tokens
@@ -30,6 +30,14 @@ pub mod prediction_market_amm {
 
     pub fn swap(ctx: Context<Swap>, is_usdc_to_token: bool, amount: u64, is_yes: bool, min_out: u64, expiration: i64) -> Result<()> {
         ctx.accounts.swap(is_usdc_to_token, amount, is_yes, min_out, expiration)
+    }
+
+    pub fn settle(ctx: Context<SettleMarket>, is_resolved: bool) -> Result<()> {
+        ctx.accounts.settle(is_resolved)
+    }
+
+    pub fn claim(ctx: Context<ClaimReward>, is_yes: bool) -> Result<()> {
+        ctx.accounts.claim(is_yes)
     }
 
     pub fn lock(ctx: Context<Update>) -> Result<()> {
