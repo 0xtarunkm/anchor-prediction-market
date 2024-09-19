@@ -67,6 +67,7 @@ impl<'info> Initialize<'info> {
             mint_yes: self.mint_yes.key(), 
             mint_no: self.mint_no.key(), 
             mint_stablecoin: self.mint_stablecoin.key(), 
+            total_liquidity: 0,
             fee, 
             locked: false, 
             settled: false, 

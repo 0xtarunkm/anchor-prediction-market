@@ -1,5 +1,4 @@
 use anchor_lang::error_code;
-use prediction_market_curve::CurveError;
 
 #[error_code]
 pub enum MarketError {
@@ -45,21 +44,4 @@ pub enum MarketError {
     MarketNotSettled,
     #[msg("Not authorized to perform this")]
     Unauthorized
-}
-
-impl From<CurveError> for MarketError {
-    fn from(error: CurveError) -> MarketError {
-        match error {
-            CurveError::InvalidPrecision => MarketError::InvalidPrecision,
-            CurveError::Overflow => MarketError::Overflow,
-            CurveError::Underflow => MarketError::Underflow,
-            CurveError::InvalidFeeAmount => MarketError::InvalidFee,
-            CurveError::InsufficientBalance => MarketError::InsufficientBalance,
-            CurveError::ZeroBalance => MarketError::ZeroBalance,
-            CurveError::SlipageLimitExceeded => MarketError::SlippageExceeded,
-            CurveError::MarketAlreadySettled => MarketError::MarketAlreadySettled,
-            CurveError::MarketNotSettled => MarketError::MarketNotSettled,
-            CurveError::Unauthorized => MarketError::Unauthorized
-        }
-    }
 }

@@ -10,6 +10,7 @@ pub struct Market {
     pub mint_yes: Pubkey,
     pub mint_no: Pubkey,
     pub mint_stablecoin: Pubkey,
+    pub total_liquidity: u64,
     pub fee: u16,
     pub locked: bool,
     pub settled: bool,

@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, Burn, burn, TransferChecked, transfer_checked}};
-use prediction_market_curve::{OutcomeToken, PredictionMarket};
 
-use crate::{error::MarketError, states::Market};
+use crate::{assert_non_zero, assert_not_expired, assert_not_locked, states::Market};
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
@@ -83,18 +82,23 @@ pub struct Withdraw<'info> {
 }
 
 impl<'info> Withdraw<'info> {
-    pub fn withdraw(&self, amount: u64, min_yes: u64, min_no: u64, _expiration: i64) -> Result<()> {
-        let amounts = PredictionMarket::remove_liquidity(amount, 10_000, self.vault_yes.amount, self.vault_no.amount, self.vault_stablecoin.amount, self.mint_lp.supply).map_err(MarketError::from)?;
+    pub fn withdraw(&self, lp_amount: u64, expiration: i64) -> Result<()> {
+        assert_not_locked!(self.market.locked);
+        assert_not_expired!(expiration);
+        assert_non_zero!([lp_amount]);
 
-        require!(
-            min_yes <= amounts.yes_amount && min_no <= amounts.no_amount,
-            MarketError::SlippageExceeded
-        );
+        let liquidity_fraction = lp_amount as f64 / self.mint_lp.supply as f64;
 
-        self.burn_lp_tokens(amount)?;
-        self.withdraw_tokens(OutcomeToken::YES, amounts.yes_amount)?;
-        self.withdraw_tokens(OutcomeToken::NO, amounts.no_amount)?;
-        self.withdraw_stablecoin(amounts.usdc_amount)
+        let usdc_to_return = (self.market.total_liquidity as f64 * liquidity_fraction) as u64;
+        let tokens_to_return = usdc_to_return / 2;
+
+        self.burn_lp_tokens(lp_amount)?;
+        self.withdraw_tokens(true, tokens_to_return)?;
+        self.withdraw_tokens(false, tokens_to_return)?;
+
+        self.market.total_liquidity.checked_sub(usdc_to_return).unwrap();
+
+        self.withdraw_stablecoin(usdc_to_return)
     }
 
     pub fn withdraw_stablecoin(&self, amount: u64) -> Result<()> {
@@ -118,28 +122,16 @@ impl<'info> Withdraw<'info> {
         transfer_checked(ctx, amount, self.mint_stablecoin.decimals)
     }
 
-    pub fn withdraw_tokens(&self, token: OutcomeToken, amount: u64) -> Result<()> {
-        let mint;
-        let (from, to) = match token {
-            OutcomeToken::YES => {
-                mint = self.mint_yes.clone();
-                (
-                self.vault_yes.to_account_info(),
-                self.user_yes.to_account_info()
-                )
-            },
-            OutcomeToken::NO => {
-                mint = self.mint_no.clone();
-                (
-                    self.vault_no.to_account_info(),
-                    self.user_no.to_account_info()
-                )
-            }
+    pub fn withdraw_tokens(&self, is_yes: bool, amount: u64) -> Result<()> {
+
+        let (from, to, mint, decimals) = match is_yes {
+            true => ( self.vault_yes.to_account_info(), self.user_yes.to_account_info(), self.mint_yes.to_account_info(), self.mint_yes.decimals),
+            false => (self.vault_no.to_account_info(), self.user_no.to_account_info(), self.mint_no.to_account_info(), self.mint_yes.decimals)
         };
 
         let cpi_accounts = TransferChecked {
             from,
-            mint: mint.to_account_info(),
+            mint,
             to,
             authority: self.auth.to_account_info()
         };
@@ -154,7 +146,7 @@ impl<'info> Withdraw<'info> {
             signer_seeds,
         );
 
-        transfer_checked(ctx, amount, mint.decimals)
+        transfer_checked(ctx, amount, decimals)
     }
 
     pub fn burn_lp_tokens(&self, amount: u64) -> Result<()> {

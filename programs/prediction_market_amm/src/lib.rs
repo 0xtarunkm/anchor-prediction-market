@@ -19,17 +19,17 @@ pub mod prediction_market_amm {
     }
 
     // add liquidity to mint LP tokens
-    pub fn deposit(ctx: Context<Deposit>, amount: u64, max_yes: u64, max_no: u64, expiration: i64) -> Result<()> {
-        ctx.accounts.deposit(amount, max_yes, max_no, expiration)
+    pub fn add_liquidity(ctx: Context<Deposit>, amount: u64, max_yes: u64, max_no: u64, expiration: i64) -> Result<()> {
+        ctx.accounts.deposit(amount, max_no, max_yes, expiration)
     }
 
     // burn lp tokens to withdraw liquidity
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_yes: u64, min_no: u64, expiration: i64) -> Result<()> {
-        ctx.accounts.withdraw(amount, min_yes, min_no, expiration)
+    pub fn withdraw_liquidity(ctx: Context<Withdraw>, amount: u64, expiration: i64) -> Result<()> {
+        ctx.accounts.withdraw(amount, expiration)
     }
 
-    pub fn swap(ctx: Context<Swap>, is_yes: bool, amount: u64, min: u64) -> Result<()> {
-        ctx.accounts.swap(is_yes, amount, min)
+    pub fn swap(ctx: Context<Swap>, is_usdc_to_token: bool, amount: u64, is_yes: bool, min_out: u64, expiration: i64) -> Result<()> {
+        ctx.accounts.swap(is_usdc_to_token, amount, is_yes, min_out, expiration)
     }
 
     pub fn lock(ctx: Context<Update>) -> Result<()> {

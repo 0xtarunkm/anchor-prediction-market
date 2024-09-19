@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked}};
-use prediction_market_curve::{OutcomeToken, PredictionMarket};
 
-use crate::{error::MarketError, states::Market};
+use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, helpers::calculate_output, states::Market};
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
@@ -89,73 +88,120 @@ pub struct Swap<'info> {
 impl<'info> Swap<'info> {
     pub fn swap(
         &mut self,
+        is_usdc_to_token: bool,
+        amount_in: u64,
         is_yes: bool,
-        amount: u64,
-        min: u64,
-        // expiration: i64
+        min_out: u64,
+        expiration: i64
     ) -> Result<()> {
-        let mut curve = PredictionMarket::init(self.vault_stablecoin.amount, self.vault_yes.amount, self.vault_no.amount, self.market.fee, Some(6)).map_err(MarketError::from)?;
+        assert_not_locked!(self.market.locked);
+        assert_not_expired!(expiration);
+        assert_non_zero!([amount_in, min_out]);
 
-        let token = match is_yes {
-            true => OutcomeToken::YES,
-            false => OutcomeToken::NO
+        let amount_out = if is_usdc_to_token {
+            if is_yes {
+                calculate_output(amount_in, self.vault_stablecoin.amount, self.vault_yes.amount)
+            } else {
+                calculate_output(amount_in, self.vault_stablecoin.amount, self.vault_no.amount)
+            }
+        } else {
+            if is_yes {
+                calculate_output(amount_in, self.vault_yes.amount, self.vault_stablecoin.amount)
+            } else {
+                calculate_output(amount_in, self.vault_no.amount, self.vault_stablecoin.amount)
+            }
         };
 
-        let res = curve.swap(token, amount, min).unwrap();
-        
-        self.deposit_tokens(token, res.usdc_amount)?;
-        self.withdraw_token(token, res.token_amount)
+        require!(amount_out < min_out, MarketError::SlippageExceeded);
+
+        if is_usdc_to_token {
+            self.deposit_tokens(true, None, amount_in)?;
+            self.withdraw_token(false, amount_out, Some(is_yes))
+        } else {
+            self.deposit_tokens(false, Some(is_yes), amount_in)?;
+            self.withdraw_token(true, amount_out, None)
+        }
     }
 
     pub fn deposit_tokens(
         &mut self,
-        token: OutcomeToken,
-        amount: u64,
+        is_usdc: bool,
+        is_yes: Option<bool>,
+        amount: u64
     ) -> Result<()> {
-        let mint;
-        let (from, to) = match token {
-            OutcomeToken::YES => {
-                mint = self.mint_yes.clone();
-                (self.user_stablecoin.to_account_info(), self.vault_yes.to_account_info())
-            },
-            OutcomeToken::NO => {
-                mint = self.mint_no.clone();
-                (self.user_stablecoin.to_account_info(), self.vault_no.to_account_info())
+        let (mint, from, to, decimals) = match is_usdc {
+            true => (
+                self.mint_stablecoin.to_account_info(),
+                self.user_stablecoin.to_account_info(),
+                self.vault_stablecoin.to_account_info(),
+                self.mint_stablecoin.decimals
+            ),
+            false => {
+                match is_yes {
+                    Some(true) => (
+                        self.mint_yes.to_account_info(),
+                        self.user_yes.to_account_info(),
+                        self.vault_yes.to_account_info(),
+                        self.mint_yes.decimals
+                    ),
+                    Some(false) => (
+                        self.mint_no.to_account_info(),
+                        self.user_no.to_account_info(),
+                        self.vault_no.to_account_info(),
+                        self.mint_no.decimals
+                    ),
+                    None => return Err(MarketError::InvalidToken.into())
+                }
             }
         };
 
         let account = TransferChecked {
             from,
-            mint: mint.to_account_info(),
+            mint,
             to,
-            authority: self.user.to_account_info()
+            authority: self.user.to_account_info(),
         };
-        
+
         let ctx = CpiContext::new(self.token_program.to_account_info(), account);
 
-        transfer_checked(ctx, amount, 6)
+        transfer_checked(ctx, amount, decimals)
     }
 
     pub fn withdraw_token(
         &mut self,
-        token: OutcomeToken,
+        is_usdc: bool,
         amount: u64,
+        is_yes: Option<bool>
     ) -> Result<()> {
-        let mint;
-        let (from, to) = match token {
-            OutcomeToken::YES => {
-                mint = self.mint_yes.clone();
-                (self.vault_yes.to_account_info(), self.user_yes.to_account_info())
-            }, 
-            OutcomeToken::NO => {
-                mint = self.mint_no.clone();
-                (self.vault_no.to_account_info(), self.user_no.to_account_info())
+        let (mint, from, to, decimals) = match is_usdc {
+            true => (
+                self.mint_stablecoin.to_account_info(),
+                self.vault_stablecoin.to_account_info(),
+                self.user_stablecoin.to_account_info(),
+                self.mint_stablecoin.decimals
+            ),
+            false => {
+                match is_yes {
+                    Some(true) => (
+                        self.mint_yes.to_account_info(),
+                        self.vault_yes.to_account_info(),
+                        self.user_yes.to_account_info(),
+                        self.mint_yes.decimals
+                    ),
+                    Some(false) => (
+                        self.mint_no.to_account_info(),
+                        self.vault_no.to_account_info(),
+                        self.user_no.to_account_info(),
+                        self.mint_no.decimals
+                    ),
+                    None => return Err(MarketError::InvalidToken.into())
+                }
             }
         };
 
         let account = TransferChecked {
             from,
-            mint: mint.to_account_info(),
+            mint,
             to,
             authority: self.auth.to_account_info()
         };
@@ -168,6 +214,6 @@ impl<'info> Swap<'info> {
 
         let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), account, signer_seeds);
 
-        transfer_checked(ctx, amount, 6)
+        transfer_checked(ctx, amount, decimals)
     }
 }

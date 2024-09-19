@@ -5,7 +5,7 @@ use crate::{has_update_authority, states::Market};
 #[derive(Accounts)]
 pub struct Update<'info> {
     #[account(mut)]
-    admin: Signer<'info>,
+    signer: Signer<'info>,
     #[account(
         mut,
         seeds = [b"market", market.seed.to_le_bytes().as_ref()],

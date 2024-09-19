@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked, MintTo, mint_to}};
-use prediction_market_curve::{OutcomeToken, PredictionMarket};
 
 use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, states:: Market};
 
@@ -43,26 +42,26 @@ pub struct Deposit<'info> {
         associated_token::mint = mint_stablecoin,
         associated_token::authority = auth
     )]
-    user_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
         associated_token::authority = auth
     )]
-    user_yes: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
         associated_token::authority = auth
     )]
-    user_no: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
         payer = user,
         associated_token::mint = mint_lp,
         associated_token::authority = user,
     )]
-    user_lp: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_lp: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: this is safe
     #[account(
         seeds = [b"auth"],
@@ -86,58 +85,71 @@ pub struct Deposit<'info> {
 impl<'info> Deposit<'info> {
     pub fn deposit(
         &mut self,
-        amount: u64,
-        max_yes: u64,
+        usdc_amount: u64,
         max_no: u64,
+        max_yes: u64,
         expiration: i64,
     ) -> Result<()> {
         assert_not_locked!(self.market.locked);
         assert_not_expired!(expiration);
-        assert_non_zero!([amount, max_yes, max_no]);
+        assert_non_zero!([usdc_amount, max_yes, max_no]);
 
-        let (yes_amount, no_amount, lp_tokens, _) = match self.mint_lp.supply == 0 && self.vault_no.amount == 0 && self.vault_yes.amount == 0 {
-            true =>  (max_yes, max_no, amount, amount),
-            false => {
-                let market = PredictionMarket::add_liquidity(&mut self, amount).unwrap();
-
-                (market.yes_amount, market.no_amount, market.lp_tokens, market.usdc_amount)
-            }
-        };
-
-        require!(yes_amount<=max_yes && no_amount<=max_no, MarketError::SlippageExceeded);
-
-        self.deposit_tokens(yes_amount, OutcomeToken::YES)?;
-        self.deposit_tokens(no_amount, OutcomeToken::NO)?;
-        self.mint_lp_tokens(lp_tokens)
-    }
-
-    pub fn deposit_tokens(
-        &mut self,
-        amount: u64,
-        token: OutcomeToken,
-    ) -> Result<()> {
-        let mint;
-        let (from, to) = match token {
-            OutcomeToken::YES => {
-                mint = self.mint_yes.clone();
-                (self.user_yes.to_account_info(), self.vault_yes.to_account_info())
-            },
-            OutcomeToken::NO => {
-                mint = self.mint_no.clone();
-                (self.user_no.to_account_info(), self.vault_no.to_account_info())
-            },
-        };
-        
+        // Transfer USDC from provider to market
         let cpi_account = TransferChecked {
-            from,
-            mint: mint.to_account_info(),
-            to,
+            from: self.user_ata_stablecoin.to_account_info(),
+            mint: self.mint_stablecoin.to_account_info(),
+            to: self.vault_stablecoin.to_account_info(), 
             authority: self.user.to_account_info()
         };
 
         let ctx = CpiContext::new(self.token_program.to_account_info(), cpi_account);
         
-        transfer_checked(ctx, amount, 6)
+        transfer_checked(ctx, usdc_amount, self.mint_stablecoin.decimals)?;
+
+        let yes_amount = (usdc_amount).checked_div(2).unwrap();
+        let no_amount = (usdc_amount).checked_div(2).unwrap();
+        
+        require!(yes_amount<=max_yes && no_amount<=max_no, MarketError::SlippageExceeded);
+
+        self.mint_token(yes_amount, true)?;
+        self.mint_token(no_amount, false)?;
+
+        let lp_token_to_mint = if self.market.total_liquidity == 0 {
+            usdc_amount
+        } else {
+            usdc_amount * self.mint_lp.supply / self.market.total_liquidity
+        };
+
+        self.market.total_liquidity.checked_add(usdc_amount).unwrap();
+
+        self.mint_lp_tokens(lp_token_to_mint)
+    }
+
+    pub fn mint_token(
+        &mut self,
+        amount: u64,
+        is_yes: bool,
+    ) -> Result<()> {
+        let (authority, to, mint) = match is_yes {
+            true => (self.auth.to_account_info(), self.vault_yes.to_account_info(), self.mint_yes.to_account_info()),
+            false => (self.auth.to_account_info(), self.vault_no.to_account_info(), self.mint_no.to_account_info())
+        };
+        
+        let cpi_account = MintTo {
+            mint,
+            to, 
+            authority
+        };
+
+        let seeds = &[
+            &b"auth"[..],
+            &[self.market.auth_bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), cpi_account, signer_seeds);
+        
+        mint_to(ctx, amount)
     }
 
     pub fn mint_lp_tokens(
@@ -146,7 +158,7 @@ impl<'info> Deposit<'info> {
     ) -> Result<()> {
         let accounts = MintTo {
             mint: self.mint_lp.to_account_info(),
-            to: self.user_lp.to_account_info(),
+            to: self.user_ata_lp.to_account_info(),
             authority: self.auth.to_account_info(),
         };
         let seeds = &[
