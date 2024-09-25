@@ -94,7 +94,6 @@ impl<'info> Deposit<'info> {
         assert_not_expired!(expiration);
         assert_non_zero!([usdc_amount, max_yes, max_no]);
 
-        // Transfer USDC from provider to market
         let cpi_account = TransferChecked {
             from: self.user_ata_stablecoin.to_account_info(),
             mint: self.mint_stablecoin.to_account_info(),
