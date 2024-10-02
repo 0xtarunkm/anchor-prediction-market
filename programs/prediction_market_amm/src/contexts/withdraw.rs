@@ -9,69 +9,67 @@ pub struct Withdraw<'info> {
     user: Signer<'info>,
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     mint_no: Box<InterfaceAccount<'info, Mint>>,
-    mint_stablecoin: Box<InterfaceAccount<'info, Mint>>,
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         seeds = [b"lp", market.key().as_ref()],
         bump,
         mint::decimals = 6,
-        mint::authority = auth,
+        mint::authority = market,
+        mint::token_program = token_program
     )]
     mint_lp: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = market
     )]
-    vault_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = user
     )]
-    user_ata_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth
+        associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
-        associated_token::authority = auth
+        associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-        init_if_needed,
-        payer = user,
+        mut,
         associated_token::mint = mint_lp,
         associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_lp: Box<InterfaceAccount<'info, TokenAccount>>,
-    /// CHECK: this is safe
     #[account(
-        seeds = [b"auth"],
-        bump = market.auth_bump
-    )]
-    auth: UncheckedAccount<'info>,
-    #[account(
+        mut,
         has_one = mint_yes,
         has_one = mint_no,
-        has_one = mint_stablecoin,
-        mut,
         seeds = [b"market", market.seed.to_le_bytes().as_ref()],
         bump = market.market_bump
     )]
@@ -103,14 +101,17 @@ impl<'info> Withdraw<'info> {
 
     pub fn withdraw_stablecoin(&self, amount: u64) -> Result<()> {
         let cpi_accounts = TransferChecked {
-            from: self.vault_stablecoin.to_account_info(),
-            mint: self.mint_stablecoin.to_account_info(),
-            to: self.user_ata_stablecoin.to_account_info(),
-            authority: self.auth.to_account_info()
+            from: self.vault_usdc.to_account_info(),
+            mint: self.mint_usdc.to_account_info(),
+            to: self.user_ata_usdc.to_account_info(),
+            authority: self.market.to_account_info()
         };
 
-        let seeds = &[&b"auth"[..], &[self.market.auth_bump]];
-
+        let seeds = &[
+            &b"market"[..],
+            &self.market.seed.to_le_bytes(),
+            &[self.market.market_bump]
+        ];
         let signer_seeds = &[&seeds[..]];
 
         let ctx = CpiContext::new_with_signer(
@@ -119,7 +120,7 @@ impl<'info> Withdraw<'info> {
             signer_seeds,
         );
 
-        transfer_checked(ctx, amount, self.mint_stablecoin.decimals)
+        transfer_checked(ctx, amount, self.mint_usdc.decimals)
     }
 
     pub fn withdraw_tokens(&self, is_yes: bool, amount: u64) -> Result<()> {
@@ -133,11 +134,14 @@ impl<'info> Withdraw<'info> {
             from,
             mint,
             to,
-            authority: self.auth.to_account_info()
+            authority: self.market.to_account_info()
         };
 
-        let seeds = &[&b"auth"[..], &[self.market.auth_bump]];
-
+        let seeds = &[
+            &b"market"[..],
+            &self.market.seed.to_le_bytes(),
+            &[self.market.market_bump]
+        ];
         let signer_seeds = &[&seeds[..]];
 
         let ctx = CpiContext::new_with_signer(

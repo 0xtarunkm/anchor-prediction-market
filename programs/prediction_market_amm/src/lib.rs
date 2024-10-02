@@ -1,25 +1,38 @@
 use anchor_lang::prelude::*;
 
-mod states;
 mod contexts;
 mod error;
-pub mod helpers;
+mod helpers;
+mod states;
 
 use contexts::*;
 
-declare_id!("HEqjCVX5AHi9kYFF955HbEeTF95DUdz1aZTviRucL16d");
+declare_id!("8vxoTyexgHLcNjo7kcRuF22uWp8fDKtK3yfehJY4Lont");
 
 #[program]
 pub mod prediction_market_amm {
 
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, seed: u64, name: String, fee: u16, end_time: i64,authority: Option<Pubkey>) -> Result<()> {
-        ctx.accounts.save_market(seed, name, fee, end_time, authority, &ctx.bumps)
+    #[inline(never)] 
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        seed: u64,
+        name: String,
+        fee: u16,
+        end_time: i64,
+    ) -> Result<()> {
+        ctx.accounts.save_market(seed, name, fee, end_time, &ctx.bumps)
     }
 
     // add liquidity to mint LP tokens
-    pub fn add_liquidity(ctx: Context<Deposit>, amount: u64, max_yes: u64, max_no: u64, expiration: i64) -> Result<()> {
+    pub fn add_liquidity(
+        ctx: Context<Deposit>,
+        amount: u64,
+        max_yes: u64,
+        max_no: u64,
+        expiration: i64,
+    ) -> Result<()> {
         ctx.accounts.deposit(amount, max_no, max_yes, expiration)
     }
 
@@ -28,8 +41,16 @@ pub mod prediction_market_amm {
         ctx.accounts.withdraw(amount, expiration)
     }
 
-    pub fn swap(ctx: Context<Swap>, is_usdc_to_token: bool, amount: u64, is_yes: bool, min_out: u64, expiration: i64) -> Result<()> {
-        ctx.accounts.swap(is_usdc_to_token, amount, is_yes, min_out, expiration)
+    pub fn swap(
+        ctx: Context<Swap>,
+        is_usdc_to_token: bool,
+        amount: u64,
+        is_yes: bool,
+        min_out: u64,
+        expiration: i64,
+    ) -> Result<()> {
+        ctx.accounts
+            .swap(is_usdc_to_token, amount, is_yes, min_out, expiration)
     }
 
     pub fn settle(ctx: Context<SettleMarket>, is_resolved: bool) -> Result<()> {

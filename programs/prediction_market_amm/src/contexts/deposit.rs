@@ -7,72 +7,87 @@ use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::Marke
 pub struct Deposit<'info> {
     #[account(mut)]
     user: Signer<'info>,
-    mint_yes: Box<InterfaceAccount<'info, Mint>>,
-    mint_no: Box<InterfaceAccount<'info, Mint>>,
-    mint_stablecoin: Box<InterfaceAccount<'info, Mint>>,
     #[account(
-        init_if_needed,
+        mut,
+        mint::token_program = token_program,
+        mint::authority = market
+    )]
+    mint_yes: Box<InterfaceAccount<'info, Mint>>,
+    #[account(
+        mut,
+        mint::token_program = token_program,
+        mint::authority = market
+    )]
+    mint_no: Box<InterfaceAccount<'info, Mint>>,
+    #[account(
+        mut,
+        mint::token_program = token_program,
+    )]
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,
+    #[account(
+        init,
         seeds = [b"lp", market.key().as_ref()],
         bump,
         payer = user,
         mint::decimals = 6,
-        mint::authority = auth
+        mint::authority = market,
+        mint::token_program = token_program
     )]
     mint_lp: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
-    vault_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
-    user_ata_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth
+        associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
-        associated_token::authority = auth
+        associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-        init_if_needed,
+        init,
         payer = user,
         associated_token::mint = mint_lp,
         associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     user_ata_lp: Box<InterfaceAccount<'info, TokenAccount>>,
-    /// CHECK: this is safe
     #[account(
-        seeds = [b"auth"],
-        bump = market.auth_bump
-    )]
-    auth: UncheckedAccount<'info>,
-    #[account(
+        mut,
         has_one = mint_yes,
         has_one = mint_no,
-        has_one = mint_stablecoin,
-        mut,
         seeds = [b"market", market.seed.to_le_bytes().as_ref()],
         bump = market.market_bump
     )]
@@ -95,15 +110,16 @@ impl<'info> Deposit<'info> {
         assert_non_zero!([usdc_amount, max_yes, max_no]);
 
         let cpi_account = TransferChecked {
-            from: self.user_ata_stablecoin.to_account_info(),
-            mint: self.mint_stablecoin.to_account_info(),
-            to: self.vault_stablecoin.to_account_info(), 
+            from: self.user_ata_usdc.to_account_info(),
+            mint: self.mint_usdc.to_account_info(),
+            to: self.vault_usdc.to_account_info(), 
             authority: self.user.to_account_info()
         };
 
         let ctx = CpiContext::new(self.token_program.to_account_info(), cpi_account);
+
         
-        transfer_checked(ctx, usdc_amount, self.mint_stablecoin.decimals)?;
+        transfer_checked(ctx, usdc_amount, self.mint_usdc.decimals)?;
 
         let yes_amount = (usdc_amount).checked_div(2).unwrap();
         let no_amount = (usdc_amount).checked_div(2).unwrap();
@@ -129,20 +145,21 @@ impl<'info> Deposit<'info> {
         amount: u64,
         is_yes: bool,
     ) -> Result<()> {
-        let (authority, to, mint) = match is_yes {
-            true => (self.auth.to_account_info(), self.vault_yes.to_account_info(), self.mint_yes.to_account_info()),
-            false => (self.auth.to_account_info(), self.vault_no.to_account_info(), self.mint_no.to_account_info())
+        let ( to, mint) = match is_yes {
+            true => (self.vault_yes.to_account_info(), self.mint_yes.to_account_info()),
+            false => (self.vault_no.to_account_info(), self.mint_no.to_account_info())
         };
         
         let cpi_account = MintTo {
             mint,
             to, 
-            authority
+            authority: self.market.to_account_info()
         };
 
         let seeds = &[
-            &b"auth"[..],
-            &[self.market.auth_bump],
+            &b"market"[..],
+            &self.market.seed.to_le_bytes(),
+            &[self.market.market_bump]
         ];
         let signer_seeds = &[&seeds[..]];
 
@@ -155,18 +172,22 @@ impl<'info> Deposit<'info> {
         &self,
         amount: u64,
     ) -> Result<()> {
+        msg!("mint authority {:?}", self.mint_lp.mint_authority);
         let accounts = MintTo {
             mint: self.mint_lp.to_account_info(),
             to: self.user_ata_lp.to_account_info(),
-            authority: self.auth.to_account_info(),
+            authority: self.market.to_account_info(), 
         };
+
         let seeds = &[
-            &b"auth"[..],
-            &[self.market.auth_bump],
+            &b"market"[..],
+            &self.market.seed.to_le_bytes(),
+            &[self.market.market_bump]
         ];
         let signer_seeds = &[&seeds[..]];
 
         let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), accounts, signer_seeds);
+
         mint_to(ctx, amount)
     }
 }

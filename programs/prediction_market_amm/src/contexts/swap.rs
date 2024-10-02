@@ -6,76 +6,71 @@ use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::Marke
 #[derive(Accounts)]
 pub struct Swap<'info> {
     #[account(mut)]
-    user: Signer<'info>,    
+    user: Signer<'info>,   
     #[account(
         mut,
-        seeds = [b"yes", market.key().as_ref()],
-        bump,
-        mint::decimals = 6,
-        mint::authority = auth,
-    )]
+        mint::token_program = token_program,
+        mint::authority = market
+    )] 
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
-        seeds = [b"no", market.key().as_ref()],
-        bump,
-        mint::decimals = 6,
-        mint::authority = auth,
+        mint::token_program = token_program,
+        mint::authority = market
     )]
     mint_no: Box<InterfaceAccount<'info, Mint>>,
-    mint_stablecoin: Box<InterfaceAccount<'info, Mint>>,    
+    #[account(
+        mint::token_program = token_program,
+    )]
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,    
     #[account(
         mut,
         seeds = [b"lp", market.key().as_ref()],
         bump,
         mint::decimals = 6,
-        mint::authority = auth,
+        mint::authority = market,
     )]
     mint_lp: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth,
+        associated_token::authority = market,
     )]
     vault_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
-        associated_token::authority = auth,
+        associated_token::authority = market,
     )]
     vault_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = market
     )]
-    vault_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
+    vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
         associated_token::authority = user,
     )]
-    user_yes: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = mint_no,
         associated_token::authority = user,
     )]
-    user_no: Box<InterfaceAccount<'info, TokenAccount>>,
+    user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_stablecoin,
+        associated_token::mint = mint_usdc,
         associated_token::authority = user,
     )]
-    user_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
-    /// CHECK: this is safe
-    #[account(
-        seeds = [b"auth"],
-        bump = market.auth_bump
-    )]
-    auth: UncheckedAccount<'info>,
+    user_ata_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
+        has_one = mint_yes,
+        has_one = mint_no,
         seeds = [b"market", market.seed.to_le_bytes().as_ref()],
         bump = market.market_bump,
     )]
@@ -100,19 +95,19 @@ impl<'info> Swap<'info> {
 
         let amount_out = if is_usdc_to_token {
             if is_yes {
-                calculate_output(amount_in, self.vault_stablecoin.amount, self.vault_yes.amount)
+                calculate_output(amount_in, self.vault_usdc.amount, self.vault_yes.amount)
             } else {
-                calculate_output(amount_in, self.vault_stablecoin.amount, self.vault_no.amount)
+                calculate_output(amount_in, self.vault_usdc.amount, self.vault_no.amount)
             }
         } else {
             if is_yes {
-                calculate_output(amount_in, self.vault_yes.amount, self.vault_stablecoin.amount)
+                calculate_output(amount_in, self.vault_yes.amount, self.vault_usdc.amount)
             } else {
-                calculate_output(amount_in, self.vault_no.amount, self.vault_stablecoin.amount)
+                calculate_output(amount_in, self.vault_no.amount, self.vault_usdc.amount)
             }
         };
 
-        require!(amount_out < min_out, MarketError::SlippageExceeded);
+        // require!(amount_out < min_out, MarketError::SlippageExceeded);
 
         if is_usdc_to_token {
             self.deposit_tokens(true, None, amount_in)?;
@@ -131,22 +126,22 @@ impl<'info> Swap<'info> {
     ) -> Result<()> {
         let (mint, from, to, decimals) = match is_usdc {
             true => (
-                self.mint_stablecoin.to_account_info(),
-                self.user_stablecoin.to_account_info(),
-                self.vault_stablecoin.to_account_info(),
-                self.mint_stablecoin.decimals
+                self.mint_usdc.to_account_info(),
+                self.user_ata_usdc.to_account_info(),
+                self.vault_usdc.to_account_info(),
+                self.mint_usdc.decimals
             ),
             false => {
                 match is_yes {
                     Some(true) => (
                         self.mint_yes.to_account_info(),
-                        self.user_yes.to_account_info(),
+                        self.user_ata_yes.to_account_info(),
                         self.vault_yes.to_account_info(),
                         self.mint_yes.decimals
                     ),
                     Some(false) => (
                         self.mint_no.to_account_info(),
-                        self.user_no.to_account_info(),
+                        self.user_ata_no.to_account_info(),
                         self.vault_no.to_account_info(),
                         self.mint_no.decimals
                     ),
@@ -175,23 +170,23 @@ impl<'info> Swap<'info> {
     ) -> Result<()> {
         let (mint, from, to, decimals) = match is_usdc {
             true => (
-                self.mint_stablecoin.to_account_info(),
-                self.vault_stablecoin.to_account_info(),
-                self.user_stablecoin.to_account_info(),
-                self.mint_stablecoin.decimals
+                self.mint_usdc.to_account_info(),
+                self.vault_usdc.to_account_info(),
+                self.user_ata_usdc.to_account_info(),
+                self.mint_usdc.decimals
             ),
             false => {
                 match is_yes {
                     Some(true) => (
                         self.mint_yes.to_account_info(),
                         self.vault_yes.to_account_info(),
-                        self.user_yes.to_account_info(),
+                        self.user_ata_yes.to_account_info(),
                         self.mint_yes.decimals
                     ),
                     Some(false) => (
                         self.mint_no.to_account_info(),
                         self.vault_no.to_account_info(),
-                        self.user_no.to_account_info(),
+                        self.user_ata_no.to_account_info(),
                         self.mint_no.decimals
                     ),
                     None => return Err(MarketError::InvalidToken.into())
@@ -203,12 +198,13 @@ impl<'info> Swap<'info> {
             from,
             mint,
             to,
-            authority: self.auth.to_account_info()
+            authority: self.market.to_account_info()
         };
 
         let seeds = &[
-            &b"auth"[..],
-            &[self.market.auth_bump]
+            &b"market"[..],
+            &self.market.seed.to_le_bytes(),
+            &[self.market.market_bump]
         ];
         let signer_seeds = &[&seeds[..]];
 

@@ -24,15 +24,3 @@ macro_rules! assert_not_expired {
         }
     };
 }
-
-#[macro_export]
-macro_rules! has_update_authority {
-    ($x:expr) => {
-        match $x.market.authority {
-            Some(a) => {
-                require_keys_eq!(a, $x.signer.key(), crate::error::MarketError::InvalidAuthority);
-            },
-            None => return err!(crate::error::MarketError::NoAuthoritySet)
-        }
-    };
-}

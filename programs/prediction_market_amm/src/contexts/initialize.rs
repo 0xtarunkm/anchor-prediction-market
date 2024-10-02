@@ -10,40 +10,37 @@ pub struct Initialize<'info> {
     signer: Signer<'info>,
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     mint_no: Box<InterfaceAccount<'info, Mint>>,
-    mint_stablecoin: Box<InterfaceAccount<'info, Mint>>,
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         init,
         payer = signer,
         associated_token::mint = mint_yes,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
         payer = signer,
         associated_token::mint = mint_no,
-        associated_token::authority = auth
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
     vault_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
         payer = signer,
-        associated_token::mint = mint_stablecoin,
-        associated_token::authority = auth
+        associated_token::mint = mint_usdc,
+        associated_token::authority = market,
+        associated_token::token_program = token_program
     )]
-    vault_stablecoin: Box<InterfaceAccount<'info, TokenAccount>>,
-    /// CHECK: this is safe
-    #[account(
-        seeds = [b"auth"],
-        bump
-    )]
-    auth: UncheckedAccount<'info>,
+    vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
         payer = signer,
         seeds = [b"market", seed.to_le_bytes().as_ref()],
         bump,
-        space = 8 + Market::INIT_SPACE
+        space = Market::INIT_SPACE
     )]
     market: Box<Account<'info, Market>>,
     system_program: Program<'info, System>,
@@ -58,22 +55,18 @@ impl<'info> Initialize<'info> {
         name: String,
         fee: u16,
         end_time: i64,
-        authority: Option<Pubkey>,
         bumps: &InitializeBumps
     ) -> Result<()> {
         self.market.set_inner(Market { 
             market_name: name, 
             seed, 
-            authority,
             mint_yes: self.mint_yes.key(), 
             mint_no: self.mint_no.key(), 
-            mint_stablecoin: self.mint_stablecoin.key(), 
             total_liquidity: 0,
             end_time,
             fee, 
             locked: false, 
             settled: false, 
-            auth_bump: bumps.auth, 
             market_bump: bumps.market 
         });
 

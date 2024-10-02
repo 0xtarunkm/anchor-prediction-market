@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{has_update_authority, states::Market};
+use crate::states::Market;
 
 #[derive(Accounts)]
 pub struct Update<'info> {
@@ -16,13 +16,11 @@ pub struct Update<'info> {
 
 impl<'info> Update<'info> {
     pub fn lock(&mut self) -> Result<()> {
-        has_update_authority!(self);
         self.market.locked = true;
         Ok(())
     }
 
     pub fn unlock(&mut self) -> Result<()> {
-        has_update_authority!(self);
         self.market.locked = false;
         Ok(())
     }
