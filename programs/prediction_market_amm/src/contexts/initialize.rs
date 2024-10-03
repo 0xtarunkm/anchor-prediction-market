@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface}};
+use anchor_spl::{associated_token::{create_idempotent, AssociatedToken}, token_interface::{Mint, TokenAccount, TokenInterface}};
 
 use crate::states::Market;
 
@@ -16,7 +16,6 @@ pub struct Initialize<'info> {
         payer = signer,
         associated_token::mint = mint_yes,
         associated_token::authority = market,
-        associated_token::token_program = token_program
     )]
     vault_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
@@ -24,23 +23,17 @@ pub struct Initialize<'info> {
         payer = signer,
         associated_token::mint = mint_no,
         associated_token::authority = market,
-        associated_token::token_program = token_program
     )]
     vault_no: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-        init,
-        payer = signer,
-        associated_token::mint = mint_usdc,
-        associated_token::authority = market,
-        associated_token::token_program = token_program
-    )]
-    vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
+    /// CHECK: This account is not read or written in this instruction
+    #[account(mut)]
+    vault_usdc: UncheckedAccount<'info>,
     #[account(
         init,
         payer = signer,
         seeds = [b"market", seed.to_le_bytes().as_ref()],
         bump,
-        space = Market::INIT_SPACE
+        space = 8 + Market::INIT_SPACE
     )]
     market: Box<Account<'info, Market>>,
     system_program: Program<'info, System>,
@@ -69,6 +62,20 @@ impl<'info> Initialize<'info> {
             settled: false, 
             market_bump: bumps.market 
         });
+
+        create_idempotent(
+            CpiContext::new(
+                self.associated_token_program.to_account_info(),
+                anchor_spl::associated_token::Create {
+                    payer: self.signer.to_account_info(),
+                    associated_token: self.vault_usdc.to_account_info(),
+                    authority: self.market.to_account_info(),
+                    mint: self.mint_usdc.to_account_info(),
+                    system_program: self.system_program.to_account_info(),
+                    token_program: self.token_program.to_account_info(),
+                }
+            )
+        )?;
 
         Ok(())
     }

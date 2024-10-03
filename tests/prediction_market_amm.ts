@@ -146,7 +146,6 @@ describe('prediction_market_amm', () => {
   });
 
   it('Deposit into the market', async () => {
-    console.log('help help!!');
     userAtaUSDC = (
       await getOrCreateAssociatedTokenAccount(
         provider.connection,
@@ -213,6 +212,17 @@ describe('prediction_market_amm', () => {
         .signers([user])
         .rpc({ skipPreflight: true });
 
+      const initialUserUSDCBalance =
+        await provider.connection.getTokenAccountBalance(userAtaUSDC);
+      const initialUserYesBalance =
+        await provider.connection.getTokenAccountBalance(userAtaYes);
+      const initialUserNoBalance =
+        await provider.connection.getTokenAccountBalance(userAtaNo);
+
+      console.log(
+        `intial USDC ${initialUserUSDCBalance.value.amount} initial YES balance ${initialUserYesBalance.value.amount} initial NO balance ${initialUserNoBalance.value.amount}`
+      );
+
       console.log('Liquidity added, transaction signature:', tx);
     } catch (error) {
       if (error instanceof SendTransactionError) {
@@ -235,16 +245,16 @@ describe('prediction_market_amm', () => {
       100_000_000
     );
 
-    const initialUserUSDCBalance =
-      await provider.connection.getTokenAccountBalance(userAtaUSDC);
-    const initialUserYesBalance =
-      await provider.connection.getTokenAccountBalance(userAtaYes);
-    const initialUserNoBalance =
-      await provider.connection.getTokenAccountBalance(userAtaNo);
+    // const initialUserUSDCBalance =
+    //   await provider.connection.getTokenAccountBalance(userAtaUSDC);
+    // const initialUserYesBalance =
+    //   await provider.connection.getTokenAccountBalance(userAtaYes);
+    // const initialUserNoBalance =
+    //   await provider.connection.getTokenAccountBalance(userAtaNo);
 
-    console.log(
-      `intial USDC ${initialUserUSDCBalance.value} initial YES balance ${initialUserYesBalance.value} initial NO balance ${initialUserNoBalance.value}`
-    );
+    // console.log(
+    //   `intial USDC ${initialUserUSDCBalance.value} initial YES balance ${initialUserYesBalance.value} initial NO balance ${initialUserNoBalance.value}`
+    // );
 
     const amountIn = new anchor.BN(10_000_000);
     const minOut = new anchor.BN(1_000_000);

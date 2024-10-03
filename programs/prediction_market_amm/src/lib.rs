@@ -7,7 +7,7 @@ mod states;
 
 use contexts::*;
 
-declare_id!("8vxoTyexgHLcNjo7kcRuF22uWp8fDKtK3yfehJY4Lont");
+declare_id!("DfLmwGRMjGEVfCcqzLpvvwmW6kugF61uyEYKoWuBoZzA");
 
 #[program]
 pub mod prediction_market_amm {
@@ -25,7 +25,6 @@ pub mod prediction_market_amm {
         ctx.accounts.save_market(seed, name, fee, end_time, &ctx.bumps)
     }
 
-    // add liquidity to mint LP tokens
     pub fn add_liquidity(
         ctx: Context<Deposit>,
         amount: u64,
@@ -36,7 +35,6 @@ pub mod prediction_market_amm {
         ctx.accounts.deposit(amount, max_no, max_yes, expiration)
     }
 
-    // burn lp tokens to withdraw liquidity
     pub fn withdraw_liquidity(ctx: Context<Withdraw>, amount: u64, expiration: i64) -> Result<()> {
         ctx.accounts.withdraw(amount, expiration)
     }
