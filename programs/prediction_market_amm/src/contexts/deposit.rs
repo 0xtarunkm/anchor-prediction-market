@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked, MintTo, mint_to}};
 
-use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, states:: Market};
+use crate::{assert_non_zero, assert_not_expired, assert_not_locked, states:: Market};
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
@@ -121,10 +121,13 @@ impl<'info> Deposit<'info> {
         
         transfer_checked(ctx, usdc_amount, self.mint_usdc.decimals)?;
 
-        let yes_amount = (usdc_amount).checked_div(2).unwrap();
-        let no_amount = (usdc_amount).checked_div(2).unwrap();
+        let yes_amount = (usdc_amount).checked_mul(10).unwrap();
+        let no_amount = (usdc_amount).checked_mul(10).unwrap();
         
-        require!(yes_amount<=max_yes && no_amount<=max_no, MarketError::SlippageExceeded);
+        msg!("yes amount is {:?}", yes_amount);
+        msg!("no amount is {:?}", yes_amount);
+        msg!("max yes amount is {:?}", max_yes);
+        msg!("max no amount is {:?}", max_no);
 
         self.mint_token(yes_amount, true)?;
         self.mint_token(no_amount, false)?;

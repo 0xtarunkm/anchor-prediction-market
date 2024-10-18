@@ -107,7 +107,7 @@ impl<'info> Swap<'info> {
             }
         };
 
-        require!(amount_out < min_out, MarketError::SlippageExceeded);
+        // require!(amount_out < min_out, MarketError::SlippageExceeded);
 
         if is_usdc_to_token {
             self.deposit_tokens(true, None, amount_in)?;

@@ -19,7 +19,6 @@ describe('prediction_market_amm', () => {
     .PredictionMarketAmm as Program<PredictionMarketAmm>;
 
   const providerWallet = provider.wallet as NodeWallet;
-  const user = anchor.web3.Keypair.generate();
 
   let mintYes: PublicKey;
   let mintNo: PublicKey;
@@ -35,19 +34,19 @@ describe('prediction_market_amm', () => {
   let userAtaLP: PublicKey;
 
   const seed = new anchor.BN(Math.floor(Math.random() * 1000000));
-  const marketName = 'Test Market';
+  const marketName = 'VK_100_IND_BAN_2024';
   const fee = 100;
   const endTime = new anchor.BN(Math.floor(Date.now() / 1000) + 86400);
 
   it('Airdrop SOL to user', async () => {
     const tx = await provider.connection.requestAirdrop(
-      user.publicKey,
+      providerWallet.publicKey,
       1000000000
     );
     await provider.connection.confirmTransaction(tx);
     console.log(
       'User balance:',
-      await provider.connection.getBalance(user.publicKey)
+      await provider.connection.getBalance(providerWallet.publicKey)
     );
   });
 
@@ -67,7 +66,7 @@ describe('prediction_market_amm', () => {
 
     userAtaLP = getAssociatedTokenAddressSync(
       mintLP,
-      user.publicKey,
+      providerWallet.publicKey,
       false,
       TOKEN_PROGRAM_ID
     );
@@ -149,9 +148,9 @@ describe('prediction_market_amm', () => {
     userAtaUSDC = (
       await getOrCreateAssociatedTokenAccount(
         provider.connection,
-        user,
+        providerWallet.payer,
         mintUSDC,
-        user.publicKey
+        providerWallet.publicKey
       )
     ).address;
     console.log('user ata usdc', userAtaUSDC);
@@ -168,9 +167,9 @@ describe('prediction_market_amm', () => {
     userAtaYes = (
       await getOrCreateAssociatedTokenAccount(
         provider.connection,
-        user,
+        providerWallet.payer,
         mintYes,
-        user.publicKey
+        providerWallet.publicKey
       )
     ).address;
     console.log(`User ata YES`, userAtaYes);
@@ -178,9 +177,9 @@ describe('prediction_market_amm', () => {
     userAtaNo = (
       await getOrCreateAssociatedTokenAccount(
         provider.connection,
-        user,
+        providerWallet.payer,
         mintNo,
-        user.publicKey
+        providerWallet.publicKey
       )
     ).address;
     console.log(`User ata no`, userAtaNo);
@@ -189,8 +188,8 @@ describe('prediction_market_amm', () => {
       const tx = await program.methods
         .addLiquidity(
           new anchor.BN(100000000), // 100 USDC
-          new anchor.BN(50000000), // 50 YES tokens
-          new anchor.BN(50000000), // 50 NO tokens
+          new anchor.BN(10000000), // 10 YES tokens
+          new anchor.BN(10000000), // 10 NO tokens
           new anchor.BN(Math.floor(Date.now() / 1000) + 3600) // Deadline in 1 hour
         )
         .accountsPartial({
@@ -206,10 +205,10 @@ describe('prediction_market_amm', () => {
           vaultYes,
           mintLp: mintLP,
           mintUsdc: mintUSDC,
-          user: user.publicKey,
+          user: providerWallet.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([user])
+        .signers([providerWallet.payer])
         .rpc({ skipPreflight: true });
 
       const initialUserUSDCBalance =
@@ -245,16 +244,16 @@ describe('prediction_market_amm', () => {
       100_000_000
     );
 
-    // const initialUserUSDCBalance =
-    //   await provider.connection.getTokenAccountBalance(userAtaUSDC);
-    // const initialUserYesBalance =
-    //   await provider.connection.getTokenAccountBalance(userAtaYes);
-    // const initialUserNoBalance =
-    //   await provider.connection.getTokenAccountBalance(userAtaNo);
+    const initialUserUSDCBalance =
+      await provider.connection.getTokenAccountBalance(userAtaUSDC);
+    const initialUserYesBalance =
+      await provider.connection.getTokenAccountBalance(userAtaYes);
+    const initialUserNoBalance =
+      await provider.connection.getTokenAccountBalance(userAtaNo);
 
-    // console.log(
-    //   `intial USDC ${initialUserUSDCBalance.value} initial YES balance ${initialUserYesBalance.value} initial NO balance ${initialUserNoBalance.value}`
-    // );
+    console.log(
+      `intial USDC ${initialUserUSDCBalance.value} initial YES balance ${initialUserYesBalance.value} initial NO balance ${initialUserNoBalance.value}`
+    );
 
     const amountIn = new anchor.BN(10_000_000);
     const minOut = new anchor.BN(1_000_000);
@@ -270,7 +269,7 @@ describe('prediction_market_amm', () => {
           mintNo,
           mintUsdc: mintUSDC,
           mintYes,
-          user: user.publicKey,
+          user: providerWallet.publicKey,
           userAtaUsdc: userAtaUSDC,
           userAtaYes,
           vaultNo,
@@ -278,7 +277,7 @@ describe('prediction_market_amm', () => {
           vaultYes,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([user])
+        .signers([providerWallet.payer])
         .rpc();
 
       console.log('Swap completed, transaction signature:', tx);
@@ -328,7 +327,7 @@ describe('prediction_market_amm', () => {
           mintNo,
           mintUsdc: mintUSDC,
           mintYes,
-          user: user.publicKey,
+          user: providerWallet.publicKey,
           userAtaUsdc: userAtaUSDC,
           userAtaYes,
           vaultNo,
@@ -336,7 +335,7 @@ describe('prediction_market_amm', () => {
           vaultYes,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([user])
+        .signers([providerWallet.payer])
         .rpc();
 
       console.log('Swap completed, transaction signature:', tx);

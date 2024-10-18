@@ -5,14 +5,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-prediction_market_amm = "DfLmwGRMjGEVfCcqzLpvvwmW6kugF61uyEYKoWuBoZzA"
+prediction_market_amm = "Gcezns5HdQgwLoRBkWxcF1LpJqYSdF5cokWnvQccm9zF"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
+wallet = "~/.config/solana/id2.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
