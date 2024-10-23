@@ -58,11 +58,3 @@ Once deployed, users can interact with the contract via CLI or through a web int
 2. **Place a Bet**: Users place their bets on possible outcomes (win/loss/draw).
 3. **Close the Market**: After the match is concluded, the market is settled based on the actual result.
 4. **Claim Winnings**: Users with successful predictions can claim their rewards.
-
-### Prediction Market Curve
-
-The curve for this market can be found at [prediciton-market-curve](https://github.com/0xtarunkm/prediction-market-curve/)
-
-### Web Interface
-
-The web interface for this prediction market can be found at [prediction-market-web](https://github.com/0xtarunkm/cricbet-prediction-market.git)
