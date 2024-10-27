@@ -62,20 +62,20 @@ pub struct Deposit<'info> {
         associated_token::token_program = token_program
     )]
     user_ata_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-        mut,
-        associated_token::mint = mint_yes,
-        associated_token::authority = user,
-        associated_token::token_program = token_program
-    )]
-    user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-        mut,
-        associated_token::mint = mint_no,
-        associated_token::authority = user,
-        associated_token::token_program = token_program
-    )]
-    user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
+    // #[account(
+    //     mut,
+    //     associated_token::mint = mint_yes,
+    //     associated_token::authority = user,
+    //     associated_token::token_program = token_program
+    // )]
+    // user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
+    // #[account(
+    //     mut,
+    //     associated_token::mint = mint_no,
+    //     associated_token::authority = user,
+    //     associated_token::token_program = token_program
+    // )]
+    // user_ata_no: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
         payer = user,
@@ -101,13 +101,13 @@ impl<'info> Deposit<'info> {
     pub fn deposit(
         &mut self,
         usdc_amount: u64,
-        max_no: u64,
-        max_yes: u64,
+        min_no: u64,
+        min_yes: u64,
         expiration: i64,
     ) -> Result<()> {
         assert_not_locked!(self.market.locked);
         assert_not_expired!(expiration);
-        assert_non_zero!([usdc_amount, max_yes, max_no]);
+        assert_non_zero!([usdc_amount, min_yes, min_no]);
 
         let cpi_account = TransferChecked {
             from: self.user_ata_usdc.to_account_info(),
@@ -121,13 +121,13 @@ impl<'info> Deposit<'info> {
         
         transfer_checked(ctx, usdc_amount, self.mint_usdc.decimals)?;
 
-        let yes_amount = (usdc_amount).checked_mul(10).unwrap();
-        let no_amount = (usdc_amount).checked_mul(10).unwrap();
+        let yes_amount = usdc_amount;
+        let no_amount = usdc_amount;
         
         msg!("yes amount is {:?}", yes_amount);
         msg!("no amount is {:?}", yes_amount);
-        msg!("max yes amount is {:?}", max_yes);
-        msg!("max no amount is {:?}", max_no);
+        msg!("min yes amount is {:?}", min_yes);
+        msg!("min no amount is {:?}", min_no);
 
         self.mint_token(yes_amount, true)?;
         self.mint_token(no_amount, false)?;

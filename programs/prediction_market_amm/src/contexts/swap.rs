@@ -50,13 +50,15 @@ pub struct Swap<'info> {
     )]
     vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_yes,
         associated_token::authority = user,
     )]
     user_ata_yes: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_no,
         associated_token::authority = user,
     )]
@@ -106,8 +108,6 @@ impl<'info> Swap<'info> {
                 calculate_output(amount_in, self.vault_no.amount, self.vault_usdc.amount)
             }
         };
-
-        require!(amount_out < min_out, MarketError::SlippageExceeded);
 
         if is_usdc_to_token {
             self.deposit_tokens(true, None, amount_in)?;
