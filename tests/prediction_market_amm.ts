@@ -12,7 +12,7 @@ import {
 import { PublicKey, SendTransactionError } from '@solana/web3.js';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 
-describe('prediction_market_amm', () => {
+describe('prediction_market', () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -145,7 +145,7 @@ describe('prediction_market_amm', () => {
     }
   });
 
-  it('Deposit into the market', async () => {
+  it('Initialize market with 1M shares on each side', async () => {
     userAtaUSDC = (
       await getOrCreateAssociatedTokenAccount(
         provider.connection,
@@ -154,7 +154,6 @@ describe('prediction_market_amm', () => {
         providerWallet.publicKey
       )
     ).address;
-    console.log('user ata usdc', userAtaUSDC);
 
     await mintTo(
       provider.connection,
@@ -162,16 +161,16 @@ describe('prediction_market_amm', () => {
       mintUSDC,
       userAtaUSDC,
       providerWallet.publicKey,
-      1_000_000_000 // 1000 USDC
+      2_000_000_000
     );
 
     try {
       const tx = await program.methods
         .addLiquidity(
-          new anchor.BN(100000000), // 100 USDC
-          new anchor.BN(10000000), // 10 YES tokens
-          new anchor.BN(10000000), // 10 NO tokens
-          new anchor.BN(Math.floor(Date.now() / 1000) + 3600) // Deadline in 1 hour
+          new anchor.BN(2_000_000_000),
+          new anchor.BN(1_000_000_000),
+          new anchor.BN(1_000_000_000),
+          new anchor.BN(Math.floor(Date.now() / 1000) + 3600)
         )
         .accountsStrict({
           market,
@@ -192,17 +191,14 @@ describe('prediction_market_amm', () => {
         .signers([providerWallet.payer])
         .rpc({ skipPreflight: true });
 
-      const initialUserUSDCBalance =
-        await provider.connection.getTokenAccountBalance(vaultUSDC);
-      const initialUserYesBalance =
-        await provider.connection.getTokenAccountBalance(vaultYes);
-      const initialUserNoBalance =
-        await provider.connection.getTokenAccountBalance(vaultNo);
+      const vaultUSDCBalance = await provider.connection.getTokenAccountBalance(vaultUSDC);
+      const vaultYesBalance = await provider.connection.getTokenAccountBalance(vaultYes);
+      const vaultNoBalance = await provider.connection.getTokenAccountBalance(vaultNo);
 
-      console.log(
-        `intial USDC ${initialUserUSDCBalance.value.amount} initial YES balance ${initialUserYesBalance.value.amount} initial NO balance ${initialUserNoBalance.value.amount}`
-      );
-
+      console.log('Initial market state:');
+      console.log(`USDC in vault: ${vaultUSDCBalance.value.uiAmount}`);
+      console.log(`YES tokens in vault: ${vaultYesBalance.value.uiAmount}`);
+      console.log(`NO tokens in vault: ${vaultNoBalance.value.uiAmount}`);
       console.log('Liquidity added, transaction signature:', tx);
     } catch (error) {
       if (error instanceof SendTransactionError) {
@@ -215,26 +211,20 @@ describe('prediction_market_amm', () => {
     }
   });
 
-  it('Swap USDC for YES tokens', async () => {
-    userAtaYes = (
-      await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        providerWallet.payer,
-        mintYes,
-        providerWallet.publicKey
-      )
-    ).address;
-    console.log(`User ata YES`, userAtaYes);
+  it('Test LMSR pricing with multiple swaps', async () => {
+    userAtaYes = (await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      providerWallet.payer,
+      mintYes,
+      providerWallet.publicKey
+    )).address;
 
-    userAtaNo = (
-      await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        providerWallet.payer,
-        mintNo,
-        providerWallet.publicKey
-      )
-    ).address;
-    console.log(`User ata no`, userAtaNo);
+    userAtaNo = (await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      providerWallet.payer,
+      mintNo,
+      providerWallet.publicKey
+    )).address;
 
     await mintTo(
       provider.connection,
@@ -242,114 +232,74 @@ describe('prediction_market_amm', () => {
       mintUSDC,
       userAtaUSDC,
       providerWallet.publicKey,
-      100_000_000
+      500_000_000
     );
 
-    const amountIn = new anchor.BN(10_000_000);
-    const minOut = new anchor.BN(1_000_000);
-    const expiration = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
+    const swapTests = [
+      { amount: 10_000_000, isYes: true, description: "10 USDC YES buy" },
+      { amount: 5_000_000, isYes: false, description: "5 USDC NO buy" },
+      { amount: 2_500_000, isYes: true, description: "2.5 USDC YES buy" },
+    ];
 
-    try {
-      const tx = await program.methods
-        .swap(true, amountIn, true, minOut, expiration)
-        .accountsStrict({
-          userAtaNo,
-          market,
-          mintLp: mintLP,
-          mintNo,
-          mintUsdc: mintUSDC,
-          mintYes,
-          user: providerWallet.publicKey,
-          userAtaUsdc: userAtaUSDC,
-          userAtaYes,
-          vaultNo,
-          vaultUsdc: vaultUSDC,
-          vaultYes,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([providerWallet.payer])
-        .rpc();
+    for (const test of swapTests) {
+      console.log(`\nExecuting ${test.description}`);
+      console.log('Before swap balances:');
+      await logBalances();
 
-      console.log('Swap completed, transaction signature:', tx);
+      try {
+        const tx = await program.methods
+          .swap(
+            true,
+            new anchor.BN(test.amount),
+            test.isYes,
+            new anchor.BN(1),
+            new anchor.BN(Math.floor(Date.now() / 1000) + 60)
+          )
+          .accountsStrict({
+            userAtaNo,
+            market,
+            mintLp: mintLP,
+            mintNo,
+            mintUsdc: mintUSDC,
+            mintYes,
+            user: providerWallet.publicKey,
+            userAtaUsdc: userAtaUSDC,
+            userAtaYes,
+            vaultNo,
+            vaultUsdc: vaultUSDC,
+            vaultYes,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([providerWallet.payer])
+          .rpc();
 
-      const initialUserUSDCBalance =
-        await provider.connection.getTokenAccountBalance(userAtaUSDC);
-      const initialUserYesBalance =
-        await provider.connection.getTokenAccountBalance(userAtaYes);
-      const initialUserNoBalance =
-        await provider.connection.getTokenAccountBalance(userAtaNo);
-
-      console.log(
-        `intial USDC ${initialUserUSDCBalance.value.amount} initial YES balance ${initialUserYesBalance.value.amount} initial NO balance ${initialUserNoBalance.value.amount}`
-      );
-    } catch (error) {
-      if (error instanceof SendTransactionError) {
-        console.error('Transaction failed:', error.message);
-        console.error('Logs:', error.logs);
-      } else {
-        console.error('An unexpected error occurred:', error);
+        console.log('After swap balances:');
+        await logBalances();
+        console.log(`Swap completed, tx: ${tx}`);
+      } catch (error) {
+        console.error(`Error in ${test.description}:`, error);
+        throw error;
       }
-      throw error;
     }
   });
 
-  it('Swap USDC for NO tokens', async () => {
-    await mintTo(
-      provider.connection,
-      providerWallet.payer,
-      mintUSDC,
-      userAtaUSDC,
-      providerWallet.publicKey,
-      100_000_000
-    );
+  async function logBalances() {
+    const vaultUSDCBalance = await provider.connection.getTokenAccountBalance(vaultUSDC);
+    const vaultYesBalance = await provider.connection.getTokenAccountBalance(vaultYes);
+    const vaultNoBalance = await provider.connection.getTokenAccountBalance(vaultNo);
+    const userUSDCBalance = await provider.connection.getTokenAccountBalance(userAtaUSDC);
+    const userYesBalance = await provider.connection.getTokenAccountBalance(userAtaYes);
+    const userNoBalance = await provider.connection.getTokenAccountBalance(userAtaNo);
 
-    const amountIn = new anchor.BN(10_000_000);
-    const minOut = new anchor.BN(1_000_000);
-    const expiration = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
-
-    try {
-      const tx = await program.methods
-        .swap(true, amountIn, false, minOut, expiration)
-        .accountsPartial({
-          userAtaNo,
-          market,
-          mintLp: mintLP,
-          mintNo,
-          mintUsdc: mintUSDC,
-          mintYes,
-          user: providerWallet.publicKey,
-          userAtaUsdc: userAtaUSDC,
-          userAtaYes,
-          vaultNo,
-          vaultUsdc: vaultUSDC,
-          vaultYes,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .signers([providerWallet.payer])
-        .rpc();
-
-      console.log('Swap completed, transaction signature:', tx);
-
-      const initialUserUSDCBalance =
-        await provider.connection.getTokenAccountBalance(userAtaUSDC);
-      const initialUserYesBalance =
-        await provider.connection.getTokenAccountBalance(userAtaYes);
-      const initialUserNoBalance =
-        await provider.connection.getTokenAccountBalance(userAtaNo);
-
-      console.log(
-        `intial USDC ${initialUserUSDCBalance.value.amount} initial YES balance ${initialUserYesBalance.value.amount} initial NO balance ${initialUserNoBalance.value.amount}`
-      );
-    } catch (error) {
-      if (error instanceof SendTransactionError) {
-        console.error('Transaction failed:', error.message);
-        console.error('Logs:', error.logs);
-      } else {
-        console.error('An unexpected error occurred:', error);
-      }
-      throw error;
-    }
-  });
+    console.log('Market Balances:');
+    console.log(`USDC in vault: ${vaultUSDCBalance.value.uiAmount}`);
+    console.log(`YES tokens in vault: ${vaultYesBalance.value.uiAmount}`);
+    console.log(`NO tokens in vault: ${vaultNoBalance.value.uiAmount}`);
+    console.log('User Balances:');
+    console.log(`USDC: ${userUSDCBalance.value.uiAmount}`);
+    console.log(`YES tokens: ${userYesBalance.value.uiAmount}`);
+    console.log(`NO tokens: ${userNoBalance.value.uiAmount}`);
+  }
 });

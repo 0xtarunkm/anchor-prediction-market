@@ -45,5 +45,15 @@ pub enum MarketError {
     #[msg("Not authorized to perform this")]
     Unauthorized,
     #[msg("Market is not expired")]
-    MarketNotEnded
+    MarketNotEnded,
+    #[msg("Math overflow")]
+    MathOverflow,
+    #[msg("Math underflow")]
+    MathUnderflow,
+    #[msg("Invalid shares")]
+    InvalidShares,
+    #[msg("Invalid price")]
+    InvalidPrice,
+    #[msg("Invalid cost")]
+    InvalidCost,
 }

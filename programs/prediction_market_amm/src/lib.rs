@@ -7,7 +7,7 @@ mod states;
 
 use contexts::*;
 
-declare_id!("Gcezns5HdQgwLoRBkWxcF1LpJqYSdF5cokWnvQccm9zF");
+declare_id!("5KXREawEvTiDAgfWH2UWVERCani5WnjJx4ZQuXardgEW");
 
 #[program]
 pub mod prediction_market_amm {

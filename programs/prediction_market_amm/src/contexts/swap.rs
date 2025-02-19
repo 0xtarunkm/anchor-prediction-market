@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked}};
 
-use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, helpers::calculate_output, states::Market};
+use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, helpers::calculate_lmsr_output, states::Market};
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
@@ -95,19 +95,15 @@ impl<'info> Swap<'info> {
         assert_not_expired!(expiration);
         assert_non_zero!([amount_in, min_out]);
 
-        let amount_out = if is_usdc_to_token {
-            if is_yes {
-                calculate_output(amount_in, self.vault_usdc.amount, self.vault_yes.amount)
-            } else {
-                calculate_output(amount_in, self.vault_usdc.amount, self.vault_no.amount)
-            }
-        } else {
-            if is_yes {
-                calculate_output(amount_in, self.vault_yes.amount, self.vault_usdc.amount)
-            } else {
-                calculate_output(amount_in, self.vault_no.amount, self.vault_usdc.amount)
-            }
-        };
+        let amount_out = calculate_lmsr_output(
+            amount_in,
+            self.vault_yes.amount,
+            self.vault_no.amount,
+            is_usdc_to_token,
+            is_yes
+        )?;
+
+        require!(amount_out >= min_out, MarketError::SlippageExceeded);
 
         if is_usdc_to_token {
             self.deposit_tokens(true, None, amount_in)?;
