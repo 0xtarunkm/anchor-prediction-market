@@ -92,7 +92,7 @@ pub struct Swap<'info> {
 impl<'info> Swap<'info> {
     pub fn swap(
         &mut self,
-        is_usdc_to_token: bool,
+        is_buying: bool,
         amount_in: u64,
         is_yes: bool,
         min_out: u64,
@@ -106,13 +106,13 @@ impl<'info> Swap<'info> {
             amount_in,
             self.vault_yes.amount,
             self.vault_no.amount,
-            is_usdc_to_token,
+            is_buying,
             is_yes,
         )?;
 
         require!(amount_out >= min_out, MarketError::SlippageExceeded);
 
-        if is_usdc_to_token {
+        if is_buying {
             self.deposit_tokens(true, None, amount_in)?;
             self.withdraw_token(false, amount_out, Some(is_yes))
         } else {

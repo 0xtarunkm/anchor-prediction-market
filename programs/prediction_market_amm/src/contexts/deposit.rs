@@ -89,15 +89,12 @@ impl<'info> Deposit<'info> {
         self.mint_token(min_yes, true)?;
         self.mint_token(min_no, false)?;
 
-        let lp_token_to_mint = if self.market.total_liquidity == 0 {
-            min_yes
-        } else {
-            min_yes * self.mint_lp.supply / self.market.total_liquidity
-        };
+        self.market
+            .total_liquidity
+            .checked_add(min_yes.checked_add(min_no).unwrap())
+            .unwrap();
 
-        self.market.total_liquidity.checked_add(min_yes).unwrap();
-
-        self.mint_lp_tokens(lp_token_to_mint)
+        Ok(())
     }
 
     pub fn mint_token(&mut self, amount: u64, is_yes: bool) -> Result<()> {
@@ -128,30 +125,6 @@ impl<'info> Deposit<'info> {
         let ctx = CpiContext::new_with_signer(
             self.token_program.to_account_info(),
             cpi_account,
-            signer_seeds,
-        );
-
-        mint_to(ctx, amount)
-    }
-
-    pub fn mint_lp_tokens(&self, amount: u64) -> Result<()> {
-        msg!("mint authority {:?}", self.mint_lp.mint_authority);
-        let accounts = MintTo {
-            mint: self.mint_lp.to_account_info(),
-            to: self.user_ata_lp.to_account_info(),
-            authority: self.market.to_account_info(),
-        };
-
-        let seeds = &[
-            &b"market"[..],
-            &self.market.seed.to_le_bytes(),
-            &[self.market.market_bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
-        let ctx = CpiContext::new_with_signer(
-            self.token_program.to_account_info(),
-            accounts,
             signer_seeds,
         );
 
