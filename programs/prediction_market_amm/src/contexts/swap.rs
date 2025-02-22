@@ -31,14 +31,6 @@ pub struct Swap<'info> {
     mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
-        seeds = [b"lp", market.key().as_ref()],
-        bump,
-        mint::decimals = 6,
-        mint::authority = market,
-    )]
-    mint_lp: Box<InterfaceAccount<'info, Mint>>,
-    #[account(
-        mut,
         associated_token::mint = mint_yes,
         associated_token::authority = market,
     )]

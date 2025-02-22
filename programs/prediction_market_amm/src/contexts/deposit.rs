@@ -28,16 +28,6 @@ pub struct Deposit<'info> {
     )]
     mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
-        init,
-        seeds = [b"lp", market.key().as_ref()],
-        bump,
-        payer = user,
-        mint::decimals = 6,
-        mint::authority = market,
-        mint::token_program = token_program
-    )]
-    mint_lp: Box<InterfaceAccount<'info, Mint>>,
-    #[account(
         mut,
         associated_token::mint = mint_yes,
         associated_token::authority = market,
@@ -58,14 +48,6 @@ pub struct Deposit<'info> {
         associated_token::token_program = token_program
     )]
     vault_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-        init,
-        payer = user,
-        associated_token::mint = mint_lp,
-        associated_token::authority = user,
-        associated_token::token_program = token_program
-    )]
-    user_ata_lp: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         has_one = mint_yes,

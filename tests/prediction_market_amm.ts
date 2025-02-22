@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey, SendTransactionError } from "@solana/web3.js";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { assert } from "chai";
 
 describe("prediction_market", () => {
   const provider = anchor.AnchorProvider.env();
@@ -24,7 +25,6 @@ describe("prediction_market", () => {
   let mintYes: PublicKey;
   let mintNo: PublicKey;
   let mintUSDC: PublicKey;
-  let mintLP: PublicKey;
   let market: PublicKey;
   let vaultYes: PublicKey;
   let vaultNo: PublicKey;
@@ -57,20 +57,6 @@ describe("prediction_market", () => {
       program.programId
     );
     market = marketPda;
-
-    const [mintLp] = PublicKey.findProgramAddressSync(
-      [Buffer.from("lp"), market.toBytes()],
-      program.programId
-    );
-
-    mintLP = mintLp;
-
-    userAtaLP = getAssociatedTokenAddressSync(
-      mintLP,
-      providerWallet.publicKey,
-      false,
-      TOKEN_PROGRAM_ID
-    );
 
     mintYes = await createMint(
       provider.connection,
@@ -175,13 +161,11 @@ describe("prediction_market", () => {
           market,
           mintNo,
           mintYes,
-          userAtaLp: userAtaLP,
           vaultNo,
           vaultUsdc: vaultUSDC,
           vaultYes,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
-          mintLp: mintLP,
           mintUsdc: mintUSDC,
           user: providerWallet.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -266,7 +250,6 @@ describe("prediction_market", () => {
           .accountsStrict({
             userAtaNo,
             market,
-            mintLp: mintLP,
             mintNo,
             mintUsdc: mintUSDC,
             mintYes,
@@ -291,6 +274,62 @@ describe("prediction_market", () => {
         throw error;
       }
     }
+  });
+
+  it("Test claim rewards after market settlement", async () => {
+    // First settle the market (YES wins)
+    await program.methods
+      .settle(true)
+      .accountsPartial({
+        market,
+        admin:providerWallet.publicKey,
+      })
+      .rpc();
+
+    // Get balances before claim
+    const beforeUserUSDC = await provider.connection.getTokenAccountBalance(userAtaUSDC);
+    const beforeUserYes = await provider.connection.getTokenAccountBalance(userAtaYes);
+    const beforeVaultUSDC = await provider.connection.getTokenAccountBalance(vaultUSDC);
+
+    // Calculate expected payout
+    const userYesTokens = beforeUserYes.value.uiAmount;
+    const totalYesSupply = (await provider.connection.getTokenSupply(mintYes)).value.uiAmount;
+    const vaultBalance = beforeVaultUSDC.value.uiAmount;
+    const expectedPayout = (userYesTokens! * vaultBalance!) / totalYesSupply!;
+
+    // Claim rewards
+    await program.methods
+      .claim(true)
+      .accountsPartial({
+        market,
+        mintYes,
+        mintNo,
+        mintUsdc: mintUSDC,
+        user: providerWallet.publicKey,
+        userAtaUsdc: userAtaUSDC,
+        userAtaYes,
+        userAtaNo,
+        vaultYes,
+        vaultNo,
+        vaultUsdc: vaultUSDC,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    // Verify balances after claim
+    const afterUserUSDC = await provider.connection.getTokenAccountBalance(userAtaUSDC);
+    const afterUserYes = await provider.connection.getTokenAccountBalance(userAtaYes);
+
+    // Assert correct payout and token burning
+    assert.equal(afterUserYes.value.uiAmount, 0, "YES tokens should be burned");
+    assert.approximately(
+      afterUserUSDC.value.uiAmount! - beforeUserUSDC.value.uiAmount!,
+      expectedPayout,
+      0.000001,
+      "Incorrect USDC payout amount"
+    );
   });
 
   async function logBalances() {

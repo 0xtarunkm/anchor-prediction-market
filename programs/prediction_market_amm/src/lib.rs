@@ -35,10 +35,6 @@ pub mod prediction_market_amm {
         ctx.accounts.deposit(max_no, max_yes, expiration)
     }
 
-    pub fn withdraw_liquidity(ctx: Context<Withdraw>, amount: u64, expiration: i64) -> Result<()> {
-        ctx.accounts.withdraw(amount, expiration)
-    }
-
     pub fn swap(
         ctx: Context<Swap>,
         is_usdc_to_token: bool,

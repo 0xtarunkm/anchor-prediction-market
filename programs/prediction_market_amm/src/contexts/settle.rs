@@ -18,7 +18,7 @@ impl<'info> SettleMarket<'info> {
     pub fn settle(&mut self, is_resolved: bool) -> Result<()> {
         assert_not_locked!(self.market.locked);
 
-        require!(self.market.settled == true, MarketError::MarketAlreadySettled);
+        require!(!self.market.settled, MarketError::MarketAlreadySettled);
 
         require!(Clock::get()?.unix_timestamp > self.market.end_time, MarketError::MarketNotEnded);
 

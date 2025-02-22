@@ -1,36 +1,33 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token_interface::{burn, Burn, Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked}};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{
+        burn, transfer_checked, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
+    },
+};
 
 use crate::{assert_not_locked, error::MarketError, states::Market};
 
 #[derive(Accounts)]
 pub struct ClaimReward<'info> {
     #[account(mut)]
-    user: Signer<'info>,    
+    user: Signer<'info>,
     #[account(
         mut,
         mint::token_program = token_program,
         mint::authority = market
-    )] 
+    )]
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         mint::token_program = token_program,
         mint::authority = market
-    )] 
+    )]
     mint_no: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mint::token_program = token_program,
-    )] 
-    mint_usdc: Box<InterfaceAccount<'info, Mint>>,    
-    #[account(
-        mut,
-        seeds = [b"lp", market.key().as_ref()],
-        bump,
-        mint::decimals = 6,
-        mint::authority = market,
     )]
-    mint_lp: Box<InterfaceAccount<'info, Mint>>,
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         associated_token::mint = mint_yes,
@@ -75,6 +72,7 @@ pub struct ClaimReward<'info> {
         bump = market.market_bump,
     )]
     pub market: Box<Account<'info, Market>>,
+
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -84,7 +82,7 @@ impl<'info> ClaimReward<'info> {
     pub fn claim(&mut self, is_yes: bool) -> Result<()> {
         assert_not_locked!(self.market.locked);
 
-        require!(self.market.settled, MarketError::MarketAlreadySettled);
+        require!(!self.market.settled, MarketError::MarketNotSettled);
 
         let (user_tokens, total_tokens) = if is_yes {
             (self.user_ata_yes.amount, self.mint_yes.supply)
@@ -112,31 +110,41 @@ impl<'info> ClaimReward<'info> {
             from: self.vault_usdc.to_account_info(),
             mint: self.mint_usdc.to_account_info(),
             to: self.user_ata_usdc.to_account_info(),
-            authority: self.market.to_account_info()
+            authority: self.market.to_account_info(),
         };
 
         let seeds = &[
             &b"market"[..],
             &self.market.seed.to_le_bytes(),
-            &[self.market.market_bump]
+            &[self.market.market_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
-        let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), accounts, signer_seeds);
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            signer_seeds,
+        );
 
         transfer_checked(ctx, amount, self.mint_usdc.decimals)
     }
 
     pub fn burn_tokens(&self, amount: u64, is_yes: bool) -> Result<()> {
         let (mint, from) = match is_yes {
-            true => (self.mint_yes.to_account_info(), self.user_ata_yes.to_account_info()),
-            false => (self.mint_no.to_account_info(), self.user_ata_no.to_account_info())
+            true => (
+                self.mint_yes.to_account_info(),
+                self.user_ata_yes.to_account_info(),
+            ),
+            false => (
+                self.mint_no.to_account_info(),
+                self.user_ata_no.to_account_info(),
+            ),
         };
 
         let cpi_accounts = Burn {
             mint,
             from,
-            authority: self.user.to_account_info()
+            authority: self.user.to_account_info(),
         };
 
         let ctx = CpiContext::new(self.token_program.to_account_info(), cpi_accounts);
