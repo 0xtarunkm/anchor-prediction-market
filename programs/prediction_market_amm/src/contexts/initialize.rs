@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::{create_idempotent, AssociatedToken}, token_interface::{Mint, TokenAccount, TokenInterface}};
+use anchor_spl::{
+    associated_token::{create_idempotent, AssociatedToken},
+    token_interface::{Mint, TokenAccount, TokenInterface},
+};
 
 use crate::states::Market;
 
@@ -36,9 +39,10 @@ pub struct Initialize<'info> {
         space = 8 + Market::INIT_SPACE
     )]
     market: Box<Account<'info, Market>>,
+
     system_program: Program<'info, System>,
     token_program: Interface<'info, TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>
+    associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> Initialize<'info> {
@@ -48,34 +52,32 @@ impl<'info> Initialize<'info> {
         name: String,
         fee: u16,
         end_time: i64,
-        bumps: &InitializeBumps
+        bumps: &InitializeBumps,
     ) -> Result<()> {
-        self.market.set_inner(Market { 
-            market_name: name, 
-            seed, 
-            mint_yes: self.mint_yes.key(), 
-            mint_no: self.mint_no.key(), 
+        self.market.set_inner(Market {
+            market_name: name,
+            seed,
+            mint_yes: self.mint_yes.key(),
+            mint_no: self.mint_no.key(),
             total_liquidity: 0,
             end_time,
-            fee, 
-            locked: false, 
-            settled: false, 
-            market_bump: bumps.market 
+            fee,
+            locked: false,
+            settled: false,
+            market_bump: bumps.market,
         });
 
-        create_idempotent(
-            CpiContext::new(
-                self.associated_token_program.to_account_info(),
-                anchor_spl::associated_token::Create {
-                    payer: self.signer.to_account_info(),
-                    associated_token: self.vault_usdc.to_account_info(),
-                    authority: self.market.to_account_info(),
-                    mint: self.mint_usdc.to_account_info(),
-                    system_program: self.system_program.to_account_info(),
-                    token_program: self.token_program.to_account_info(),
-                }
-            )
-        )?;
+        create_idempotent(CpiContext::new(
+            self.associated_token_program.to_account_info(),
+            anchor_spl::associated_token::Create {
+                payer: self.signer.to_account_info(),
+                associated_token: self.vault_usdc.to_account_info(),
+                authority: self.market.to_account_info(),
+                mint: self.mint_usdc.to_account_info(),
+                system_program: self.system_program.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+            },
+        ))?;
 
         Ok(())
     }

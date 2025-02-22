@@ -1,17 +1,23 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked}};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+};
 
-use crate::{assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError, helpers::calculate_lmsr_output, states::Market};
+use crate::{
+    assert_non_zero, assert_not_expired, assert_not_locked, error::MarketError,
+    helpers::calculate_lmsr_output, states::Market,
+};
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
     #[account(mut)]
-    user: Signer<'info>,   
+    user: Signer<'info>,
     #[account(
         mut,
         mint::token_program = token_program,
         mint::authority = market
-    )] 
+    )]
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
@@ -22,7 +28,7 @@ pub struct Swap<'info> {
     #[account(
         mint::token_program = token_program,
     )]
-    mint_usdc: Box<InterfaceAccount<'info, Mint>>,    
+    mint_usdc: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         seeds = [b"lp", market.key().as_ref()],
@@ -77,6 +83,7 @@ pub struct Swap<'info> {
         bump = market.market_bump,
     )]
     pub market: Box<Account<'info, Market>>,
+
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -89,7 +96,7 @@ impl<'info> Swap<'info> {
         amount_in: u64,
         is_yes: bool,
         min_out: u64,
-        expiration: i64
+        expiration: i64,
     ) -> Result<()> {
         assert_not_locked!(self.market.locked);
         assert_not_expired!(expiration);
@@ -100,7 +107,7 @@ impl<'info> Swap<'info> {
             self.vault_yes.amount,
             self.vault_no.amount,
             is_usdc_to_token,
-            is_yes
+            is_yes,
         )?;
 
         require!(amount_out >= min_out, MarketError::SlippageExceeded);
@@ -118,32 +125,30 @@ impl<'info> Swap<'info> {
         &mut self,
         is_usdc: bool,
         is_yes: Option<bool>,
-        amount: u64
+        amount: u64,
     ) -> Result<()> {
         let (mint, from, to, decimals) = match is_usdc {
             true => (
                 self.mint_usdc.to_account_info(),
                 self.user_ata_usdc.to_account_info(),
                 self.vault_usdc.to_account_info(),
-                self.mint_usdc.decimals
+                self.mint_usdc.decimals,
             ),
-            false => {
-                match is_yes {
-                    Some(true) => (
-                        self.mint_yes.to_account_info(),
-                        self.user_ata_yes.to_account_info(),
-                        self.vault_yes.to_account_info(),
-                        self.mint_yes.decimals
-                    ),
-                    Some(false) => (
-                        self.mint_no.to_account_info(),
-                        self.user_ata_no.to_account_info(),
-                        self.vault_no.to_account_info(),
-                        self.mint_no.decimals
-                    ),
-                    None => return Err(MarketError::InvalidToken.into())
-                }
-            }
+            false => match is_yes {
+                Some(true) => (
+                    self.mint_yes.to_account_info(),
+                    self.user_ata_yes.to_account_info(),
+                    self.vault_yes.to_account_info(),
+                    self.mint_yes.decimals,
+                ),
+                Some(false) => (
+                    self.mint_no.to_account_info(),
+                    self.user_ata_no.to_account_info(),
+                    self.vault_no.to_account_info(),
+                    self.mint_no.decimals,
+                ),
+                None => return Err(MarketError::InvalidToken.into()),
+            },
         };
 
         let account = TransferChecked {
@@ -162,49 +167,51 @@ impl<'info> Swap<'info> {
         &mut self,
         is_usdc: bool,
         amount: u64,
-        is_yes: Option<bool>
+        is_yes: Option<bool>,
     ) -> Result<()> {
         let (mint, from, to, decimals) = match is_usdc {
             true => (
                 self.mint_usdc.to_account_info(),
                 self.vault_usdc.to_account_info(),
                 self.user_ata_usdc.to_account_info(),
-                self.mint_usdc.decimals
+                self.mint_usdc.decimals,
             ),
-            false => {
-                match is_yes {
-                    Some(true) => (
-                        self.mint_yes.to_account_info(),
-                        self.vault_yes.to_account_info(),
-                        self.user_ata_yes.to_account_info(),
-                        self.mint_yes.decimals
-                    ),
-                    Some(false) => (
-                        self.mint_no.to_account_info(),
-                        self.vault_no.to_account_info(),
-                        self.user_ata_no.to_account_info(),
-                        self.mint_no.decimals
-                    ),
-                    None => return Err(MarketError::InvalidToken.into())
-                }
-            }
+            false => match is_yes {
+                Some(true) => (
+                    self.mint_yes.to_account_info(),
+                    self.vault_yes.to_account_info(),
+                    self.user_ata_yes.to_account_info(),
+                    self.mint_yes.decimals,
+                ),
+                Some(false) => (
+                    self.mint_no.to_account_info(),
+                    self.vault_no.to_account_info(),
+                    self.user_ata_no.to_account_info(),
+                    self.mint_no.decimals,
+                ),
+                None => return Err(MarketError::InvalidToken.into()),
+            },
         };
 
         let account = TransferChecked {
             from,
             mint,
             to,
-            authority: self.market.to_account_info()
+            authority: self.market.to_account_info(),
         };
 
         let seeds = &[
             &b"market"[..],
             &self.market.seed.to_le_bytes(),
-            &[self.market.market_bump]
+            &[self.market.market_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
-        let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), account, signer_seeds);
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            account,
+            signer_seeds,
+        );
 
         transfer_checked(ctx, amount, decimals)
     }

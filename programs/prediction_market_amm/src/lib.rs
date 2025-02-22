@@ -14,7 +14,7 @@ pub mod prediction_market_amm {
 
     use super::*;
 
-    #[inline(never)] 
+    #[inline(never)]
     pub fn initialize(
         ctx: Context<Initialize>,
         seed: u64,
@@ -22,17 +22,17 @@ pub mod prediction_market_amm {
         fee: u16,
         end_time: i64,
     ) -> Result<()> {
-        ctx.accounts.save_market(seed, name, fee, end_time, &ctx.bumps)
+        ctx.accounts
+            .save_market(seed, name, fee, end_time, &ctx.bumps)
     }
 
     pub fn add_liquidity(
         ctx: Context<Deposit>,
-        amount: u64,
         max_yes: u64,
         max_no: u64,
         expiration: i64,
     ) -> Result<()> {
-        ctx.accounts.deposit(amount, max_no, max_yes, expiration)
+        ctx.accounts.deposit(max_no, max_yes, expiration)
     }
 
     pub fn withdraw_liquidity(ctx: Context<Withdraw>, amount: u64, expiration: i64) -> Result<()> {
