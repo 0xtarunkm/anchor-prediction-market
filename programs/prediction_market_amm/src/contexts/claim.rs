@@ -15,13 +15,13 @@ pub struct ClaimReward<'info> {
     #[account(
         mut,
         mint::token_program = token_program,
-        mint::authority = market
+        mint::authority = user
     )]
     mint_yes: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         mut,
         mint::token_program = token_program,
-        mint::authority = market
+        mint::authority = user
     )]
     mint_no: Box<InterfaceAccount<'info, Mint>>,
     #[account(
